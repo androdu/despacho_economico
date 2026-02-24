@@ -103,7 +103,7 @@ streamlit run app/Home.py
 
 ## 10. App desplegada
 Pega aquí tu link de Streamlit Cloud:
-- https://TU-LINK.streamlit.app
+-https://4oh5guu4tjacdu9qus82ys.streamlit.app/Demanda_CENACE
 
 ---
 
