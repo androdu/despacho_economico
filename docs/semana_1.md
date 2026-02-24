@@ -1,14 +1,24 @@
 # Semana 1 – Integración de Demanda CENACE
 
 ## 1. Objetivo
-
 Implementar un cliente en Python que permita consultar datos reales de demanda eléctrica del CENACE y visualizarlos en una aplicación Streamlit, estableciendo la base para un simulador de despacho económico.
 
 ---
 
-## 2. Arquitectura del Proyecto
+## 2. User Journey (Flujo del Usuario)
+1. El usuario ingresa a la aplicación Streamlit.
+2. Selecciona el sistema eléctrico: SIN, BCA o BCS.
+3. Presiona “Descargar”.
+4. La app consulta la API oficial de CENACE o utiliza caché local si está disponible.
+5. Se muestran:
+   - Reporte de calidad de datos
+   - Tabla horaria
+   - Gráfica de demanda/generación/pronóstico
+6. El usuario puede descargar el CSV.
 
-Estructura implementada:
+---
+
+## 3. Arquitectura del Proyecto
 
 despacho_economico/
 │
@@ -22,69 +32,80 @@ despacho_economico/
 ├── data_cache/
 ├── docs/
 │   └── semana_1.md
+├── .streamlit/
+│   └── config.toml
 ├── requirements.txt
 └── README.md
 
 Separación clara entre:
 - Lógica de negocio (cenace_client.py)
 - Interfaz (Streamlit)
-- Persistencia local (cache)
+- Persistencia local (Parquet)
 
 ---
 
-## 3. Cliente CENACE
-
+## 4. Cliente CENACE
 Se implementó un cliente HTTP que:
-
-- Consume el WebMethod:
-  https://www.cenace.gob.mx/GraficaDemanda.aspx/obtieneValoresTotal
+- Consume el WebMethod: https://www.cenace.gob.mx/GraficaDemanda.aspx/obtieneValoresTotal
 - Utiliza headers compatibles con el endpoint ASP.NET
-- Permite consultar:
-  - SIN
-  - BCA
-  - BCS
+- Permite consultar SIN, BCA y BCS
+- Convierte valores a numéricos y genera timestamp horario
+
+Nota: los datos no son simulados (si CENACE cae, el cliente puede regresar ceros solo si se habilita el modo mock).
 
 ---
 
-## 4. Sistema de Caché
-
+## 5. Sistema de Caché
 Se implementó almacenamiento local en formato Parquet para:
-
 - Evitar consultas repetidas
 - Mejorar tiempos de respuesta
-- Permitir funcionamiento incluso si CENACE está temporalmente fuera de servicio
+- Permitir funcionamiento si CENACE está temporalmente fuera de servicio
 
-Directorio utilizado:
-data_cache/
-
----
-
-## 5. Interfaz
-
-Se desarrolló una aplicación Streamlit que:
-
-- Permite seleccionar sistema eléctrico
-- Permite seleccionar rango de fechas
-- Visualiza demanda horaria
-- Muestra tabla exportable
+Directorio: data_cache/
 
 ---
 
-## 6. Validación
-
-Se verificó que:
-
-- Los datos no son simulados
-- La información corresponde a datos reales publicados por CENACE
-- La app responde tanto con caché como con consulta directa
+## 6. Validación y Calidad de Datos
+Se revisa:
+- Columnas esperadas
+- Rango horario 1–24
+- Horas faltantes
+- Duplicados
+- Conteo de NaN en columnas clave
 
 ---
 
-## 7. Resultado
+## 7. Supuestos (Scope actual)
+- Se modela cada sistema como entidad independiente.
+- Se trabaja con la jornada actual (limitación del endpoint consultado).
+- No se modelan restricciones de transmisión.
+- No se modelan rampas ni unit commitment.
+- No se ejecuta optimización todavía.
 
-Semana 1 establece una base funcional y profesional para la construcción del modelo de despacho económico utilizando PyPSA en fases posteriores.
-## 8. Diagrama Conceptual
+---
 
-Usuario → Streamlit UI → cenace_client.py → CENACE API  
-                              ↓  
-                         data_cache (Parquet)
+## 8. Not Doing Yet (No implementado todavía)
+- Despacho económico con optimización (PyPSA).
+- Modelado de red eléctrica y transmisión.
+- Análisis multi-día / histórico.
+- Integración de tecnologías (renovables, baterías, costos marginales).
+
+---
+
+## 9. Cómo correr local
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app/Home.py
+
+---
+
+## 10. App desplegada
+Pega aquí tu link de Streamlit Cloud:
+- https://TU-LINK.streamlit.app
+
+---
+
+## 11. Resultado
+Semana 1 deja una base modular, reproducible y lista para expandirse con PyPSA en las siguientes semanas.
