@@ -12,7 +12,7 @@ COLORS_ACTIVE = {
     "generacion_mw": "#16A34A",
     "pronostico_mw": "#EA580C",
 }
-COLOR_GREY = "rgba(160,160,160,0.35)"
+COLOR_GREY = "rgba(160,160,160,0.30)"
 
 st.title("Demanda CENACE")
 st.caption("Datos del día actual. La API de CENACE (obtieneValoresTotal) solo expone la jornada en curso.")
@@ -71,25 +71,12 @@ def to_clean_df(df: pd.DataFrame) -> pd.DataFrame:
 
     return out
 
-# ====== Descarga ======
 if st.button("Descargar"):
     with st.spinner("Consultando CENACE..."):
         res = fetch_demand(system=system, use_cache=use_cache)
 
     df_raw = res.df
     df = to_clean_df(df_raw)
-
-    st.session_state["demand_df"]     = df
-    st.session_state["demand_df_raw"] = df_raw
-    st.session_state["demand_res"]    = res
-    st.session_state["demand_system"] = system
-
-# ====== Render (persiste tras interacciones del radio) ======
-if "demand_df" in st.session_state:
-    df      = st.session_state["demand_df"]
-    df_raw  = st.session_state["demand_df_raw"]
-    res     = st.session_state["demand_res"]
-    sys_loaded = st.session_state["demand_system"]
 
     # Estado cache
     st.caption(f"Cache: {res.from_cache} | Batches: {res.batches}")
@@ -101,15 +88,18 @@ if "demand_df" in st.session_state:
     # ====== KPIs ======
     st.subheader("Resumen (KPIs)")
 
+    # Elegimos la serie principal para KPIs
     serie = df["demanda_mw"] if "demanda_mw" in df.columns else pd.Series(dtype=float)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Demanda máx (MW)",     f"{serie.max():,.0f}"  if serie.notna().any() else "—")
-    c2.metric("Demanda mín (MW)",     f"{serie.min():,.0f}"  if serie.notna().any() else "—")
+    c1.metric("Demanda máx (MW)", f"{serie.max():,.0f}" if serie.notna().any() else "—")
+    c2.metric("Demanda mín (MW)", f"{serie.min():,.0f}" if serie.notna().any() else "—")
     c3.metric("Demanda promedio (MW)", f"{serie.mean():,.0f}" if serie.notna().any() else "—")
 
+    # “Última hora disponible”
     if "hora" in df.columns and df["hora"].notna().any():
-        c4.metric("Última hora", f"{int(df['hora'].dropna().max())}")
+        last_hour = int(df["hora"].dropna().max())
+        c4.metric("Última hora", f"{last_hour}")
     else:
         c4.metric("Última hora", "—")
 
@@ -117,6 +107,7 @@ if "demand_df" in st.session_state:
     st.subheader("Calidad de datos")
     rep = quality_report(df)
 
+    # Alertas claras (sin rollo)
     if rep["missing_cols"]:
         st.warning(f"Faltan columnas esperadas: {rep['missing_cols']}")
 
@@ -128,6 +119,7 @@ if "demand_df" in st.session_state:
     if rep["duplicate_hours"] and rep["duplicate_hours"] > 0:
         st.warning(f"Horas duplicadas: {rep['duplicate_hours']}")
 
+    # NAs por columna importante
     na_imp = {k: v for k, v in rep["na_counts"].items() if k in ["demanda_mw", "generacion_mw", "pronostico_mw"]}
     if any(v > 0 for v in na_imp.values()):
         st.warning(f"Valores faltantes (NaN) en columnas clave: {na_imp}")
@@ -141,71 +133,24 @@ if "demand_df" in st.session_state:
     # ====== Gráfica ======
     st.subheader("Gráfica")
     plot_cols = [c for c in ["demanda_mw", "generacion_mw", "pronostico_mw"] if c in df.columns]
-
     if "hora" in df.columns and plot_cols:
         import plotly.graph_objects as go
-
-        # Control de serie destacada
-        opts = ["Todas"] + [SERIES_LABELS[c] for c in plot_cols]
-        highlight_label = st.radio(
-            "Destacar serie:",
-            opts,
-            horizontal=True,
-            index=0,
-            key="highlight_series",
-        )
-        highlight_col = (
-            None
-            if highlight_label == "Todas"
-            else next(c for c in plot_cols if SERIES_LABELS[c] == highlight_label)
-        )
-
         fig = go.Figure()
         for col in plot_cols:
-            if highlight_col is None:
-                # Modo normal: colores propios
-                color = COLORS_ACTIVE[col]
-                lw    = 2
-                label = SERIES_LABELS[col]
-            elif col == highlight_col:
-                # Serie destacada
-                color = COLORS_ACTIVE[col]
-                lw    = 3
-                label = SERIES_LABELS[col]
-            else:
-                # Series secundarias: gris
-                color = COLOR_GREY
-                lw    = 1.5
-                label = SERIES_LABELS[col]
-
             fig.add_trace(go.Scatter(
-                x=df["hora"],
-                y=df[col],
-                mode="lines",
-                name=label,
-                line=dict(color=color, width=lw),
-                hovertemplate=f"{SERIES_LABELS[col]} — Hora %{{x}}: %{{y:,.0f}} MW<extra></extra>",
+                x=df["hora"], y=df[col], mode="lines", name=col,
+                hovertemplate="Hora %{x}: %{y:,.0f} MW<extra></extra>"
             ))
-
-        if sys_loaded == "SIN":
-            yaxis_cfg = dict(
+        fig.update_layout(
+            yaxis=dict(
                 autorange=False,
-                range=[30000, 45000],
+                range=[30000, 50000],
                 tickmode="linear",
                 tick0=30000,
                 dtick=2000,
                 tickformat=",.0f",
                 exponentformat="none",
-            )
-        else:
-            yaxis_cfg = dict(
-                autorange=True,
-                tickformat=",.0f",
-                exponentformat="none",
-            )
-
-        fig.update_layout(
-            yaxis=yaxis_cfg,
+            ),
             height=320,
             margin=dict(l=0, r=0, t=20, b=0),
         )
@@ -220,14 +165,14 @@ if "demand_df" in st.session_state:
     st.download_button(
         "Descargar CSV (limpio)",
         data=csv_clean,
-        file_name=f"demanda_{sys_loaded}_clean.csv",
-        mime="text/csv",
+        file_name=f"demanda_{system}_clean.csv",
+        mime="text/csv"
     )
 
     csv_raw = df_raw.to_csv(index=False).encode("utf-8")
     st.download_button(
         "Descargar CSV (raw)",
         data=csv_raw,
-        file_name=f"demanda_{sys_loaded}_raw.csv",
-        mime="text/csv",
+        file_name=f"demanda_{system}_raw.csv",
+        mime="text/csv"
     )
