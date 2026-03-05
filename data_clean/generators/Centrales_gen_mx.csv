@@ -1,0 +1,500 @@
+﻿name,bus,carrier,p_nom,marginal_cost,efficiency
+C.H El Gallo,SIN,hydro,30,0,1
+P.S Lunasol 1,SIN,solar,19.2,0,1
+Tingambato,SIN,hydro,42,0,1
+Ixtapantongo,SIN,hydro,45,0,1
+C.H La villita,SIN,hydro,320,0,1
+C.H El infiernito,SIN,hydro,1200,0,1
+C.T Petacalco,SIN,steam_other,2778,40.8,0.33
+C.T Tula,SIN,steam_other,945.6,40.8,0.33
+Tula Paquete 1,SIN,gas_ccgt,560,29.87,0.49
+C.T Tula__1,SIN,steam_other,660,40.8,0.33
+C.T Pemex Miguel Hidalgo,SIN,steam_other,133.7,40.8,0.33
+C.H Tepexi,SIN,steam_other,60,40.8,0.33
+C.H Necaxa,SIN,steam_other,109,40.8,0.33
+Aguas tratadas del valle de mexico,SIN,biogas,29.9,0,0.3
+CI ELAN generauno 1,SIN,diesel_engine,1.84,285.05,0.35
+Maniobras EVM 2,SIN,gas_ccgt,590,29.87,0.49
+Energia del valle de mexico 2,SIN,gas_ccgt,342,29.87,0.49
+TG Energia del valle de mexico,SIN,gas_ocgt,99,43.16,0.35
+C.H Palta,SIN,hydro,36,0,1
+TG Victoria,SIN,gas_ocgt,32,43.16,0.35
+TG Cuautitlan,SIN,gas_ocgt,32,43.16,0.35
+TG Coyotepec,SIN,gas_ocgt,64,43.16,0.35
+TG Vallejo,SIN,gas_ocgt,32,43.16,0.35
+CI Harinera la espiga,SIN,diesel_engine,2,285.05,0.35
+TG Villa de las flores,SIN,gas_ocgt,32,43.16,0.35
+CI Sanborns,SIN,diesel_engine,0.99,285.05,0.35
+TG Ecatepec,SIN,gas_ocgt,32,43.16,0.35
+CI Sanborns satelite,SIN,diesel_engine,0.99,285.05,0.35
+TG Remedios,SIN,gas_ocgt,32,43.16,0.35
+TG Tlanepantla cogeneracion,SIN,gas_ocgt,28,43.16,0.35
+TG Valle de mexico,SIN,gas_ocgt,18,43.16,0.35
+Valle de mexico 2,SIN,steam_other,644,40.8,0.33
+C.T Valle de mexico,SIN,steam_other,549,40.8,0.33
+CEGEN 11,SIN,steam_other,2,40.8,0.33
+CI Goplas (AU),SIN,diesel_engine,1.42,285.05,0.35
+TG Laminas acanaladas infinita (COG),SIN,gas_ocgt,6,43.16,0.35
+TG Nonoalco,SIN,gas_ocgt,169,43.16,0.35
+TG Aragon,SIN,gas_ocgt,32,43.16,0.35
+CI Sanborns 2 (COG),SIN,diesel_engine,0.99,285.05,0.35
+Lerma,SIN,steam_other,75,40.8,0.33
+TG Grimann,SIN,gas_ocgt,1.6,43.16,0.35
+C.T Polioles (COG),SIN,steam_other,2.5,40.8,0.33
+T.G Atenco,SIN,gas_ocgt,32,43.16,0.35
+T.G Magdalena,SIN,gas_ocgt,32,43.16,0.35
+T.G Santa Cruz,SIN,gas_ocgt,32,43.16,0.35
+CI Sanborns Perisur (COG),SIN,diesel_engine,0.99,285.05,0.35
+CI Fermicaise,SIN,diesel_engine,9.6,285.05,0.35
+T.G Iztapalapa,SIN,gas_ocgt,32,43.16,0.35
+C.H Alameda,SIN,hydro,6.99,0,1
+T.G Coapa,SIN,gas_ocgt,32,43.16,0.35
+C.C.C Centro,SIN,gas_ccgt,642,29.87,0.49
+Energia renovable de cuautla,SIN,diesel_engine,1,285.05,0.35
+Parque solar xoxocotla,SIN,solar,70,0,1
+Global Denim,SIN,chp,21,29.87,0.4
+Sky Epps Supply,SIN,chp,28,29.87,0.4
+Cog. Independencia,SIN,chp,60,29.87,0.4
+CENGEN27,SIN,solar,200,0,1
+Energia de apizaco,SIN,chp,40.5,29.87,0.4
+La Magdalena 2,SIN,solar,220,0,1
+Igsapak Cogeneracion,SIN,chp,51,29.87,0.4
+Pier 1,SIN,onwind,87,0,1
+Pier IV,SIN,onwind,134,0,1
+Cuyoaco,SIN,solar,200,0,1
+Granjas carroll cogeneracion con biogas,SIN,biogas,1.1,0,0.3
+Pier 2 Quecolac Felipe Angeles,SIN,onwind,66,0,1
+C.C San lorenzo,SIN,gas_ccgt,464,29.87,0.49
+Samborns de mexico,SIN,chp,3,29.87,0.4
+CENGEN 50,SIN,solar,250,0,1
+CENGEN 57,SIN,solar,330,0,1
+C.H El caracol,SIN,hydro,600,0,1
+Colotlipa,SIN,hydro,8,0,1
+La venta,SIN,onwind,30,0,1
+Cruces,SIN,hydro,36,0,1
+C.N Laguna verde,SIN,nuclear,1620,10,0.33
+Ingenio la gloria,SIN,biomass,45,0,0.25
+Dos bocas,SIN,chp,226,29.87,0.4
+Humeros 3,SIN,geothermal,52,0,1
+Los Humeros U-11,SIN,geothermal,27,0,1
+Central Geotermoelectrica humeros,SIN,geothermal,15,0,1
+Los Humeros 3 Fase A,SIN,geothermal,27,0,1
+C.H Minas,SIN,hydro,15,0,1
+Atexaco,SIN,hydro,32,0,1
+Central Hidroelectrica Encanto,SIN,hydro,10,0,1
+CENGEN 26,SIN,geothermal,100,0,1
+Granjas carroll de mexico,SIN,chp,7.5,29.87,0.4
+Fuerza y energia de tuxpan,SIN,gas_ccgt,901,29.87,0.49
+CENGEN 51,SIN,gas_ccgt,1000,29.87,0.49
+GEN CFE,SIN,steam_other,2100,40.8,0.33
+Electrcidad aguila de tuxpan,SIN,gas_ccgt,547,29.87,0.49
+Electrcidad sol de tuxpan,SIN,solar,547,0,1
+Distrito industrial,SIN,steam_other,18,40.8,0.33
+Temascal 1 - 230,SIN,steam_other,200,40.8,0.33
+Bio papel printing,SIN,biomass,30,0,0.25
+Temascal 1 - 115,SIN,hydro,154,0,1
+Tres Valles,SIN,biomass,30,0,0.25
+PIASA cogeneracion,SIN,chp,50,29.87,0.4
+PROENERMEX Santa gertrudis,SIN,hydro,12,0,1
+Planta hidroelectrica de veracruz,SIN,hydro,30,0,1
+Tuxpango,SIN,hydro,39,0,1
+Ingenio san nicolas,SIN,biomass,15,0,0.25
+Chilapan,SIN,hydro,30,0,1
+Idesa braskem,SIN,chp,175,29.87,0.4
+Refineria minatitlan,SIN,chp,35,29.87,0.4
+Refineria lazaro cardenas,SIN,chp,60,29.87,0.4
+Complejo Petroquimico Cangrejera,SIN,chp,48,29.87,0.4
+Generacion Energia Infra,SIN,chp,145,29.87,0.4
+La venta PEMEX,SIN,onwind,24.8,0,1
+Iquisa,SIN,gas_ocgt,60,43.16,0.35
+Pajaritos 2,SIN,chp,88.8,29.87,0.4
+Sistemas energeticos sisa,SIN,chp,60,29.87,0.4
+Complejo Petroquimico Cosoleacaque,SIN,solar,48,0,1
+Abent Tercer tren,SIN,chp,275,29.87,0.4
+CENGEN CFE 17/Enero 2024,SIN,hydro,1080,0,1
+Peñitas,SIN,hydro,420,0,1
+Manuel Moreno Torres (Chicoasen),SIN,hydro,2400,0,1
+Bombana,SIN,hydro,5.2,0,1
+La angostura,SIN,hydro,900,0,1
+Schpoina,SIN,hydro,2.24,0,1
+Eolica de Arraiga,SIN,onwind,28.8,0,1
+Ingenio huixtla,SIN,biomass,12,0,0.25
+Generadores eolicos de mexico,SIN,onwind,20,0,1
+Cecilio del valle,SIN,hydro,21,0,1
+P.E Energia eolica del sur,SIN,onwind,396,0,1
+P.E Oaxaca 2,SIN,onwind,102,0,1
+P.E Oaxaca IV,SIN,onwind,102,0,1
+D.E.M de oaxaca,SIN,onwind,90,0,1
+D.E.M de oaxaca 2,SIN,onwind,138,0,1
+P.E Bii stinu 2,SIN,onwind,142,0,1
+P.E Eoliatec del pacifico,SIN,onwind,160,0,1
+P.E Sureste 1 Fase 2,SIN,onwind,102,0,1
+P.E de oaxaca 3,SIN,onwind,102,0,1
+SEDENA,SIN,onwind,15,0,1
+Refineria Salina cruz,SIN,chp,90,29.87,0.4
+P.E Bii Nee Stipa,SIN,onwind,26.4,0,1
+P.E Electrica del valle de mexico,SIN,onwind,67.5,0,1
+P.E Bii Stinu 1,SIN,onwind,22,0,1
+P.E La venta 2,SIN,onwind,83.3,0,1
+P.E Oaxaca 1,SIN,onwind,102,0,1
+P.E La venta 3,SIN,onwind,102.9,0,1
+P.E Ingenio,SIN,onwind,49.5,0,1
+P.E Eurus,SIN,onwind,250.5,0,1
+P.E de mexico,SIN,onwind,99.9,0,1
+CENGEN 62,SIN,onwind,48,0,1
+CENGEN 61,SIN,onwind,252,0,1
+P.E Fuerza eolica del istmo,SIN,onwind,80,0,1
+P.E Bii Hioxo Norte,SIN,onwind,120,0,1
+P.E Bii Hioxo Sur,SIN,onwind,114,0,1
+P.E Dos arbolitos,SIN,onwind,70,0,1
+P.E El retiro,SIN,onwind,74,0,1
+P.E Zopiloapan,SIN,onwind,70,0,1
+P.E Stipa Nayaa,SIN,onwind,74,0,1
+Cogeneracion nuevo pemex,SIN,chp,347.4,29.87,0.4
+Cactus PEMEX,SIN,chp,54,29.87,0.4
+Ciudad PEMEX,SIN,chp,56,29.87,0.4
+Givaudan,SIN,solar,258,0,1
+San Ildefonso,SIN,hydro,2.7,0,1
+C.C El Sauz,SIN,gas_ccgt,333,29.87,0.49
+Ibedrola cogeneracion bajio,SIN,chp,53.7,29.87,0.4
+CI Ponderosa,SIN,diesel_engine,20,285.05,0.35
+T.G Arancia,SIN,gas_ocgt,20,43.16,0.35
+Fotovoltaica Guajiro,SIN,solar,101.4,0,1
+C.H Zimapan,SIN,hydro,292,0,1
+CI Agrogen,SIN,diesel_engine,9,285.05,0.35
+B.G La loma,SIN,biogas,2.8,0,0.3
+CI Atlatek,SIN,diesel_engine,1,285.05,0.35
+CEAUT 23,SIN,solar,30,0,1
+Parque solar don jose,SIN,solar,250,0,1
+Mexsolar 1,SIN,solar,30,0,1
+Mexsolar 2,SIN,solar,30,0,1
+Eolica de Guanajuato,SIN,onwind,63,0,1
+CENGEN 46,SIN,diesel_engine,30,285.05,0.35
+T.G Italaise,SIN,gas_ocgt,5.2,43.16,0.35
+T.G Mission Hill,SIN,gas_ocgt,7.5,43.16,0.35
+Tampico 1,SIN,solar,30,0,1
+Tampico 2,SIN,solar,60,0,1
+CENGEN 22 (Repotenciacion),SIN,gas_ccgt,242,29.87,0.49
+C.C Bajio,SIN,gas_ccgt,643,29.87,0.49
+Fotovoltaica Santiago,SIN,solar,170,0,1
+Eolica Santiago,SIN,onwind,106,0,1
+C.T Villa de reyes,SIN,steam_other,700,40.8,0.33
+CEAUT 26,SIN,gas_ccgt,80,29.87,0.49
+P.E Dominicana,SIN,onwind,200,0,1
+Salsipuedes solar,SIN,solar,30,0,1
+B.G Energia verde Aguascalientes,SIN,biogas,3.2,0,0.3
+Tepezala solar,SIN,solar,100,0,1
+CI Productos farmaceuticos,SIN,diesel_engine,4,285.05,0.35
+CENGEN 53,SIN,solar,200,0,1
+Solem 1,SIN,solar,140,0,1
+Solem 2,SIN,solar,150,0,1
+Energia limpia de palo alto,SIN,onwind,200,0,1
+Los pinos,SIN,onwind,30,0,1
+Pachamama,SIN,solar,300,0,1
+Viborillas park,SIN,onwind,100,0,1
+CEAUT 25,SIN,chp,64,29.87,0.4
+P.E Los altos,SIN,onwind,50,0,1
+Central los cuervos,SIN,solar,200,0,1
+Fotovoltaica aguascalientes potencia,SIN,solar,60,0,1
+Aguascalientes sur 1,SIN,solar,30,0,1
+Trompezon,SIN,onwind,126,0,1
+El salitre,SIN,onwind,1,0,1
+La bufa,SIN,onwind,90,0,1
+Aldebaran FV,SIN,solar,15,0,1
+CENGEN 47,SIN,solar,89,0,1
+Calera,SIN,solar,80,0,1
+Horus solar,SIN,solar,95,0,1
+Tuli Energia,SIN,solar,150,0,1
+CENGEN 60,SIN,solar,400,0,1
+Helios generacion,SIN,solar,150,0,1
+Potosi solar,SIN,solar,300,0,1
+Vientos del altiplano,SIN,onwind,100,0,1
+CENGEN 55,SIN,solar,40,0,1
+CI Polimeros y derivados,SIN,diesel_engine,2,285.05,0.35
+Potreros solar,SIN,solar,270,0,1
+CI Agribrands purina,SIN,diesel_engine,0.9,285.05,0.35
+Refineria PEMEX,SIN,chp,142.8,29.87,0.4
+Salamanca P.V,SIN,solar,550,0,1
+Salamanca cogeneracion,SIN,chp,393,29.87,0.4
+Hidroelectrica solis,SIN,hydro,15,0,1
+F.V Solar apaseo,SIN,solar,1,0,1
+C.H Botello,SIN,hydro,18,0,1
+Celanese mexicana cogeneracion,SIN,chp,10,29.87,0.4
+Cog. C.S Energia,SIN,chp,1,29.87,0.4
+Azufres F51 - U13,SIN,geothermal,26,0,1
+Azufres F52,SIN,geothermal,50,0,1
+Azufres 3 fase 2,SIN,geothermal,25,0,1
+Azufres F51 - U16,SIN,geothermal,26,0,1
+Azufres F58,SIN,geothermal,26,0,1
+Azufres F59,SIN,geothermal,26,0,1
+Azufres T59,SIN,geothermal,50,0,1
+C.H Cupatitzio,SIN,hydro,80,0,1
+T.G Inpamex,SIN,gas_ocgt,8.3,43.16,0.35
+C.H Zumpimito,SIN,hydro,8.4,0,1
+C.H Cobano,SIN,hydro,60,0,1
+C.H Nueva italia,SIN,hydro,5,0,1
+C.H Chilatan,SIN,hydro,19,0,1
+C.H Trojes,SIN,hydro,8.6,0,1
+C.T Manzanillo,SIN,hydro,1300,0,1
+C.C Manzanillo,SIN,gas_ccgt,1460,29.87,0.49
+Hidroelectrica arcoiris,SIN,hydro,8.4,0,1
+Hidroelectrica Tacotan,SIN,hydro,6,0,1
+Hidroelectrica Trigomil,SIN,hydro,8,0,1
+C.H La yesca,SIN,hydro,750,0,1
+C.H Santa rosa,SIN,hydro,68,0,1
+CI Ingenio de tala,SIN,diesel_engine,31.3,285.05,0.35
+Fortius 1,SIN,solar,6.2,0,1
+Fortius 2,SIN,solar,6.2,0,1
+CI Parque tecnologico,SIN,diesel_engine,7,285.05,0.35
+C.H Agua prieta,SIN,hydro,240,0,1
+Almex cogeneracion,SIN,chp,12,29.87,0.4
+C.H Colimilla,SIN,hydro,51.2,0,1
+C.H Puente grande,SIN,hydro,9.5,0,1
+Tierra Mojada,SIN,gas_ccgt,874,29.87,0.49
+Celanese mexicana cogeneracion__1,SIN,chp,13.3,29.87,0.4
+C.H Aguamilpa,SIN,hydro,960,0,1
+Generadora electrica san rafael,SIN,hydro,28.8,0,1
+Bioelectrica de occidente,SIN,steam_other,4,40.8,0.33
+C.H El cajon,SIN,hydro,750,0,1
+Geo domo san pedro,SIN,geothermal,35,0,1
+Eolica peñasco uno,SIN,onwind,2,0,1
+Eolica peñasco dos,SIN,onwind,3,0,1
+Centro puerto libertad,SIN,steam_other,632,40.8,0.33
+Akin solar,SIN,solar,100,0,1
+Pima solar uno,SIN,solar,110,0,1
+Solar abril 99,SIN,solar,99,0,1
+AT Solar V,SIN,solar,180,0,1
+Tuto energy dos,SIN,solar,137.5,0,1
+Don diego solar,SIN,solar,125,0,1
+Central Turbogas Caborca,SIN,gas_ocgt,42,43.16,0.35
+Fuerza y energia naco-nogales + AUT,SIN,gas_ccgt,308,29.87,0.49
+Central Agua prieta 2,SIN,solar,409.1,0,1
+CE GEN 4,SIN,onwind,12.3,0,1
+Union energetica del noroeste (Etapa 1),SIN,chp,17.4,29.87,0.4
+C.C La caridad generacion,SIN,gas_ccgt,525,29.87,0.49
+Planta solar orejana,SIN,solar,125,0,1
+Ibedrola renovables noroeste (hermosillo foltovoltaico),SIN,solar,100,0,1
+"Central plutarco elias calles ""El novillo""",SIN,hydro,135,0,1
+C.C Hermosillo,SIN,gas_ccgt,227.022,29.87,0.49
+CE GEN 52,SIN,onwind,300,0,1
+Fuerza y energia hermosillo,SIN,gas_ccgt,279,29.87,0.49
+Munisol,SIN,solar,19.8,0,1
+Parque solar mi ranchito sur,SIN,solar,25,0,1
+CE AUT2,SIN,onwind,10,0,1
+CE GEN 38,SIN,onwind,100,0,1
+Planta Guaymas 2 (Carlos Rodriguez Rivero),SIN,steam_other,484,40.8,0.33
+BlueMex power 1,SIN,solar,90,0,1
+Empalme ciclo combinado 1,SIN,gas_ccgt,783.57,29.87,0.49
+Empalme ciclo combinado 2,SIN,gas_ccgt,807.241,29.87,0.49
+C.H Oviachic,SIN,hydro,19.2,0,1
+Navojoa solar,SIN,solar,200,0,1
+Central Mocuzari,SIN,hydro,9.6,0,1
+"Central Luis donaldo colosio murrieta ""huites""",SIN,hydro,422,0,1
+CE GEN 37,SIN,onwind,99,0,1
+C.C Topolobampo 2,SIN,gas_ccgt,887.34,29.87,0.49
+C.C Topolobampo 3,SIN,gas_ccgt,790.83,29.87,0.49
+C.H El fuerte,SIN,hydro,59.4,0,1
+C.T Juan de dios batiz paredes,SIN,steam_other,320,40.8,0.33
+C.H Bacurato,SIN,hydro,92,0,1
+C.H Humaya,SIN,hydro,90,0,1
+C.H Salanola,SIN,hydro,14,0,1
+C.H Comedero,SIN,hydro,100,0,1
+Central turbogas culiacan,SIN,gas_ocgt,30,43.16,0.35
+Central termoelectrica Jose Aceves Pozos,SIN,steam_other,616,40.8,0.33
+RMSC Comercio Altair Alaia II-V,SIN,solar,180,0,1
+T.G Industrial juarez,SIN,gas_ocgt,18,43.16,0.35
+CEAUT 8,SIN,solar,150,0,1
+El rollo solar juarez renovables,SIN,solar,60,0,1
+Norte 3,SIN,gas_ccgt,906,29.87,0.49
+C.T Salamayuca,SIN,steam_other,316,40.8,0.33
+C.C Salamayuca 2,SIN,gas_ccgt,348,29.87,0.49
+C.C Chihuahua 3,SIN,gas_ccgt,268,29.87,0.49
+CENGEN 23,SIN,gas_ccgt,80,29.87,0.49
+T.G Parque,SIN,gas_ocgt,46,43.16,0.35
+Los santos solar,SIN,solar,13.6,0,1
+Ahumada 2,SIN,solar,30,0,1
+Ahumada IV,SIN,solar,30,0,1
+Ahumada 5,SIN,solar,30,0,1
+Ahumada 3,SIN,solar,30,0,1
+Ahumada 1,SIN,solar,30,0,1
+BNB Villa ahumada solar,SIN,solar,150,0,1
+Santa maria solar,SIN,solar,148,0,1
+C.C El encino,SIN,gas_ccgt,619,29.87,0.49
+C.C Norte 2,SIN,gas_ccgt,433,29.87,0.49
+Bafar,SIN,chp,8,29.87,0.4
+Emerging energy,SIN,solar,111,0,1
+Sol de los manzanos,SIN,solar,30,0,1
+Desarollos solares de delicias,SIN,solar,15,0,1
+C.H Boquilla,SIN,hydro,25,0,1
+Avant,SIN,solar,30,0,1
+C.T Francisco villa,SIN,steam_other,316,40.8,0.33
+Rancho el trece,SIN,gas_ccgt,13,29.87,0.49
+C.C Gomez palacios,SIN,gas_ccgt,220,29.87,0.49
+C.C La laguna (Ibedrola),SIN,gas_ccgt,510,29.87,0.49
+C.T Lerdo,SIN,steam_other,320,40.8,0.33
+Coronel,SIN,gas_ocgt,2,43.16,0.35
+T.G Chavez,SIN,gas_ocgt,24,43.16,0.35
+Andalucia 2,SIN,solar,83,0,1
+Laguna solar,SIN,solar,101,0,1
+Parque solar coahuila,SIN,solar,20,0,1
+CENGEN 64,SIN,solar,150,0,1
+Villanueva solar 3,SIN,solar,330,0,1
+Villanueva solar 1,SIN,solar,250,0,1
+Parras cone,SIN,gas_ccgt,8,29.87,0.49
+CEAUT 22,SIN,solar,50,0,1
+CENGEN 5,SIN,solar,100,0,1
+TAI Durango 5,SIN,solar,25,0,1
+"TAI DURANGO 2,3,4",SIN,solar,30,0,1
+"La trinidad solar 1 y 3, Tai durango 6",SIN,solar,90,0,1
+C.C Norte durango,SIN,gas_ccgt,450,29.87,0.49
+"Versalles de las cuatas 1,2 y 3",SIN,solar,65,0,1
+C.C Rio Bravo 2,SIN,gas_ccgt,511,29.87,0.49
+C.C Rio Bravo 3,SIN,gas_ccgt,512,29.87,0.49
+C.C Rio Bravo 4,SIN,gas_ccgt,512,29.87,0.49
+CEAUT 24,SIN,onwind,172,0,1
+C.C Energia buena vista,SIN,gas_ccgt,540,29.87,0.49
+Rio Bravo,SIN,steam_other,514,40.8,0.33
+Parque eolico dolores,SIN,onwind,269,0,1
+CEAUT 19,SIN,solar,117,0,1
+Parque eolico el cortijo,SIN,onwind,168,0,1
+Parque eolico reynosa 3,SIN,onwind,431,0,1
+El porvenir,SIN,hydro,54,0,1
+Salitrillos,SIN,onwind,99,0,1
+CENGEN 48,SIN,solar,250,0,1
+PEMEX,SIN,chp,19.5,29.87,0.4
+Ventika 1,SIN,onwind,126,0,1
+Ventika 2,SIN,onwind,126,0,1
+CEAUT 18,SIN,onwind,117,0,1
+Falcon mexicano,SIN,hydro,31.5,0,1
+Amistad,SIN,onwind,66,0,1
+Energia limpia la amistad IV,SIN,hydro,150,0,1
+Energia limpia la amistad 3,SIN,hydro,99,0,1
+Energia limpia la amistad,SIN,hydro,200,0,1
+Carbon 2,SIN,steam_other,1400,40.8,0.33
+Rio escondido,SIN,hydro,724,0,1
+AHMSA,SIN,chp,135,29.87,0.4
+T.G Huinala,SIN,gas_ocgt,300,43.16,0.35
+C.C Huinala 1,SIN,gas_ccgt,300,29.87,0.49
+C.C Huinala 2,SIN,gas_ccgt,450,29.87,0.49
+CENGEN 48__1,SIN,gas_ccgt,250,29.87,0.49
+Los ramones,SIN,gas_ocgt,550,43.16,0.35
+C.C Dulces nombres 1,SIN,gas_ccgt,1008,29.87,0.49
+T.G Tecnologico,SIN,gas_ocgt,25,43.16,0.35
+T.G Fundidora,SIN,gas_ocgt,12,43.16,0.35
+C.C Dulces nombres 2,SIN,gas_ccgt,338,29.87,0.49
+Lamosa energia de monterrey,SIN,chp,7.9,29.87,0.4
+Eolica santa catarina maniobras,SIN,onwind,22,0,1
+El carmen,SIN,gas_ccgt,857,29.87,0.49
+C.C Escobedo,SIN,gas_ccgt,1000,29.87,0.49
+El mezquite,SIN,onwind,250,0,1
+C.C Pesqueria,SIN,gas_ccgt,966,29.87,0.49
+C.C Zinc nacional,SIN,gas_ccgt,15,29.87,0.49
+T.G Universidad,SIN,gas_ocgt,24,43.16,0.35
+T.G Leona,SIN,gas_ocgt,24,43.16,0.35
+CENGEN 49,SIN,onwind,96,0,1
+Central eolica coahuila,SIN,onwind,200,0,1
+AK Green power park,SIN,solar,100,0,1
+CEAUT 7,SIN,chp,50,29.87,0.4
+Deacero power,SIN,chp,112,29.87,0.4
+C.C Ibedrola cogeneracion ramos,SIN,gas_ccgt,67,29.87,0.49
+Central C.C Saltillo,SIN,gas_ccgt,297,29.87,0.49
+Ideal de sanamiento saltillo,SIN,biogas,1,,0.3
+Pollux energy proyect,SIN,solar,30,0,1
+Generadora electrica de huinala,SIN,gas_ccgt,143,29.87,0.49
+Caelum renovables y energia villaldama 1,SIN,solar,2,0,1
+PEMEX refinacion,SIN,chp,79,29.87,0.4
+CENGEN 54,SIN,gas_ccgt,300,29.87,0.49
+CENGEN 44,SIN,gas_ccgt,198,29.87,0.49
+Eolica Vicente guerrero,SIN,onwind,118,0,1
+Compania eoloeletrica de ciudad victoria,SIN,onwind,50,0,1
+Tres mesas IV,SIN,onwind,96,0,1
+Eolica tres mesas,SIN,onwind,63,0,1
+Eolica tres mesas 2,SIN,onwind,86,0,1
+Eolica tres mesas 3,SIN,onwind,49.5,0,1
+Mesa la paz,SIN,onwind,300,0,1
+Eolica la mesa,SIN,onwind,50,0,1
+El salto,SIN,hydro,18,0,1
+Ingenio san miguel el naranjo,SIN,biomass,50,0,0.25
+Termoelectrica peñoles,SIN,steam_other,260,40.8,0.33
+Termoeletrica del golfo,SIN,steam_other,260,40.8,0.33
+El clerigo,SIN,gas_ccgt,500,29.87,0.49
+C.C Tamazunchale,SIN,gas_ccgt,1020,29.87,0.49
+C.C Altamira 3,SIN,gas_ccgt,660,29.87,0.49
+C.C Altamira IV,SIN,gas_ccgt,460,29.87,0.49
+C.C Electrica el aguila,SIN,gas_ccgt,520,29.87,0.49
+C.C Altamira 5,SIN,gas_ccgt,1120,29.87,0.49
+C.T Altamira,SIN,gas_ccgt,665,29.87,0.49
+RM U1 Feb-20,SIN,gas_ccgt,165,29.87,0.49
+Santa Amalia Tamaulipas,SIN,chp,61,29.87,0.4
+DuPont,SIN,chp,24,29.87,0.4
+CENGEN 19,SIN,gas_ocgt,23,43.16,0.35
+Praxair,SIN,chp,20,29.87,0.4
+Basf,SIN,chp,10,29.87,0.4
+Kaltex,SIN,chp,36,29.87,0.4
+Enertek,SIN,gas_ccgt,188,29.87,0.49
+PEMEX__1,SIN,chp,128,29.87,0.4
+Cogeneracion de altamira,SIN,chp,350,29.87,0.4
+Aeroderivadas,BCA,gas_ocgt,135,43.16,0.35
+Turbo gas TT1,BCA,gas_ocgt,60,43.16,0.35
+C.C Presidente juarez,BCA,gas_ccgt,766,29.87,0.49
+T.G Presidente juarez,BCA,gas_ocgt,150,43.16,0.35
+C.T Presidente juarez,BCA,steam_other,320,40.8,0.33
+Parque eolico rumorosa,BCA,onwind,10,0,1
+CE AUT 33,BCA,solar,30,0,1
+T.G Cipres,BCA,gas_ocgt,27.5,43.16,0.35
+C.C Baja california 3,BCA,gas_ccgt,324,29.87,0.49
+Rumorosa solar,BCA,solar,41,0,1
+C.C Mexicali,BCA,gas_ccgt,489,29.87,0.49
+T.G Mexicali,BCA,gas_ocgt,62,43.16,0.35
+T.G Gonzales ortega,BCA,gas_ocgt,187,43.16,0.35
+C.C Gonzales ortega,BCA,gas_ccgt,683,29.87,0.49
+Parque fotovoltaico CP,BCA,solar,5,0,1
+Cerro prieto uno,BCA,geothermal,30,0,1
+Cerro prieto dos,BCA,geothermal,220,0,1
+Cerro prieto tres,BCA,geothermal,220,0,1
+Cerro prieto cuatro,BCA,geothermal,100,0,1
+C.C San luis rio colorado,BCA,gas_ccgt,683,29.87,0.49
+C.C Campeche,SIN,gas_ccgt,252.4,29.87,0.49
+CENGEN 56,SIN,solar,300,0,1
+C.T Lerma,SIN,steam_other,112.5,40.8,0.33
+T.G Carmen,SIN,gas_ocgt,33,43.16,0.35
+Photoemeris sustentable,SIN,solar,30,0,1
+C.C Merida 3,SIN,gas_ccgt,484,29.87,0.49
+CENGEN CFE10,SIN,solar,521,0,1
+COG Enerkin,SIN,chp,13.1,29.87,0.4
+CI Nutricarsa,SIN,diesel_engine,1.1,285.05,0.35
+Energia solar san ignacio,SIN,solar,20,0,1
+CENGEN 39,SIN,solar,70,0,1
+CENGEN 58,SIN,solar,86,0,1
+Energia renovable de la peninsula,SIN,solar,90,0,1
+CENGEN 43,SIN,solar,30,0,1
+T.G Nizuc,SIN,gas_ocgt,88,43.16,0.35
+T.G Cancun,SIN,gas_ocgt,72,43.16,0.35
+C.T.G Chankanaab,SIN,steam_other,53,40.8,0.33
+T.G Xul-Ha,SIN,gas_ocgt,58.7,43.16,0.35
+Central agustin olachea puerto san carlos,BCS,diesel_engine,104,285.05,0.35
+T.G Villa constitucion,BCS,gas_ocgt,30,43.16,0.35
+CEPP3,BCS,solar,30,0,1
+Aura solar,BCS,solar,30,0,1
+Aura solar tres,BCS,solar,25,0,1
+Central baja california sur,BCS,solar_thermal,209.6,0,1
+Aeroderivadas coromuel,BCS,gas_ocgt,75.2,43.16,0.35
+T.G Lecheria,BCS,gas_ocgt,74,43.16,0.35
+CENGEN 45,BCS,solar,50,0,1
+T.G Punta prieta 1,BCS,gas_ocgt,43,43.16,0.35
+Aeroderivadas punta prieta 1,BCS,gas_ocgt,75.2,43.16,0.35
+T.C Punta prieta 2,BCS,steam_other,112.5,40.8,0.33
+CENGEN CFE11,BCS,diesel_engine,199,285.05,0.35
+CENGEN 35,BCS,steam_other,100,40.8,0.33
+Central turbogas los cabos,BCS,gas_ocgt,158.7,43.16,0.35
+CE GEN18,BCS,diesel_engine,5,285.05,0.35
+Central fotovoltaica santa rosalia,Mugele,solar,1,0,1
+Central Geotermica tres virgenes,Mugele,geothermal,10,0,1
+Central diesel electrica santa rosalia - unidades de emergencia,Mugele,diesel_engine,11.3,285.05,0.35
+Turbo jet santa rosalia,Mugele,gas_ocgt,12.5,43.16,0.35
+Central diesel electrica santa rosalia,Mugele,diesel_engine,7.15,285.05,0.35
+Guerrero negro 2,Mugele,diesel_engine,10.8,285.05,0.35
+Guerrero negro 3,Mugele,diesel_engine,11.6,285.05,0.35
+Turbo jet Vizcaino,Mugele,gas_ocgt,12.5,43.16,0.35
+Turbo gas Vizcaino - Unidades de emergencia,Mugele,gas_ocgt,24,43.16,0.35
+CENGEN CFE1,Mugele,diesel_engine,4,285.05,0.35

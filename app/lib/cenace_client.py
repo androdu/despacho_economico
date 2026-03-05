@@ -129,3 +129,27 @@ def fetch_demand(
             pass
 
     return FetchResult(df=df, from_cache=False, batches=1)
+
+
+def fetch_demand_batch(
+    systems: list[str] | None = None,
+    use_cache: bool = True,
+    timeout: int = 30,
+    allow_mock_on_error: bool = True,
+) -> dict[str, FetchResult]:
+    """
+    Descarga la demanda del día actual para SIN, BCA y BCS en lote.
+    Cada sistema se descarga por separado y se cachea individualmente.
+    Devuelve un dict  {sistema: FetchResult}.
+    """
+    if systems is None:
+        systems = ["SIN", "BCA", "BCS"]
+    return {
+        s: fetch_demand(
+            system=s,
+            use_cache=use_cache,
+            timeout=timeout,
+            allow_mock_on_error=allow_mock_on_error,
+        )
+        for s in systems
+    }
