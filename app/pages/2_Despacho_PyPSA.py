@@ -30,6 +30,7 @@ CARRIERS = [
     "hydro", "nuclear", "solar", "onwind", "solar_thermal",
     "geothermal", "biogas", "biomass", "chp",
     "gas_ccgt", "gas_ocgt", "steam_other", "diesel_engine",
+    "battery",
 ]
 CARRIER_LABELS = {
     "hydro":         "Hidroeléctrica",
@@ -45,6 +46,7 @@ CARRIER_LABELS = {
     "gas_ocgt":      "Gas OCGT",
     "steam_other":   "Termoeléctrica (carbón/FO)",
     "diesel_engine": "Diesel",
+    "battery":       "Batería (descarga neta)",
     "shedding":      "Carga no servida",
 }
 CARRIER_COLORS = {
@@ -61,11 +63,12 @@ CARRIER_COLORS = {
     "gas_ocgt":      "#FB923C",
     "steam_other":   "#78716C",
     "diesel_engine": "#EF4444",
+    "battery":       "#06B6D4",
     "shedding":      "#DC2626",
 }
 
 # Default marginal costs ($/MWh) — based on CFE/CENACE reference
-DEFAULT_COSTS: dict[str, int] = {
+DEFAULT_COSTS: dict[str, float] = {
     "hydro":         0,
     "nuclear":       5,
     "solar":         0,
@@ -81,36 +84,126 @@ DEFAULT_COSTS: dict[str, int] = {
     "diesel_engine": 100,
 }
 
+
+def compute_effective_costs(params: dict) -> dict[str, float]:
+    """Apply marginal_cost_multiplier and marginal_cost_adder on top of DEFAULT_COSTS."""
+    costs = {c: float(v) for c, v in DEFAULT_COSTS.items()}
+    for carrier, mult in params.get("marginal_cost_multiplier", {}).items():
+        if carrier in costs:
+            costs[carrier] = round(costs[carrier] * float(mult), 4)
+    for carrier, add in params.get("marginal_cost_adder", {}).items():
+        if carrier in costs:
+            costs[carrier] = round(costs[carrier] + float(add), 4)
+    return costs
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Preset scenarios  (5 lecciones pedagógicas)
+# Schema: params.marginal_cost_multiplier / adder applied ON TOP of DEFAULT_COSTS
+# Implemented: capacity_multiplier, forced_outage, battery_enable + battery_*
+# Reserved (no-op): capacity_delta_mw, vre_profile_multiplier
 # ──────────────────────────────────────────────────────────────────────────────
+BASE_SCENARIO_KEY = "🏭 Base 2026"
+
 SCENARIOS: dict[str, dict] = {
-    "🏭 Base 2026": {
-        "desc":   "Costos estándar del SEN. La hidro y renovables despachan primero; el gas cubre la demanda residual.",
-        "lesson": "Gas domina BCA/BCS. En SIN, la hidro + eólica + solar son la base.",
-        "costs":  {**DEFAULT_COSTS},
+    BASE_SCENARIO_KEY: {
+        "desc":   "Costos de referencia del SEN. Hidro y renovables despachan primero; el gas cubre la demanda residual.",
+        "lesson": "Gas domina BCA/BCS. En SIN, la hidro + eólica + solar son la base. Sin shocks externos.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder":      {},
+            "voll_value":               3000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+            # reserved
+            "capacity_multiplier":      {},
+            "capacity_delta_mw":        {},
+            "forced_outage":            {"enabled": False},
+            "vre_profile_multiplier":   {},
+            "battery_enable":           True,
+        },
     },
-    "⛽ Gas caro (×2)": {
-        "desc":   "Gas (CCGT y OCGT) al doble de precio — simula un shock de precios de gas natural.",
-        "lesson": "La hidro desplaza al gas; el precio marginal en BCA sube bruscamente. El precio sombra refleja la escasez de alternativas.",
-        "costs":  {**DEFAULT_COSTS, "gas_ccgt": 100, "gas_ocgt": 140, "chp": 70},
+    "⛽ Fuel Price Shock": {
+        "desc":   "Encarecimiento de combustibles fósiles — gas sube más, carbón sube poco. Adders: CCGT +30, OCGT +40, CHP +25, Diésel +50, Carbón +10.",
+        "lesson": "Sube el costo total y el precio marginal nodal. Renovables e hidro se vuelven relativamente más atractivas. Si el sistema depende mucho de térmicas caras, puede aparecer shedding.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder": {
+                "gas_ccgt":      30,   # 50 + 30 = 80 $/MWh
+                "gas_ocgt":      40,   # 70 + 40 = 110 $/MWh
+                "chp":           25,   # 35 + 25 = 60 $/MWh
+                "diesel_engine": 50,   # 100 + 50 = 150 $/MWh
+                "steam_other":   10,   # 30 + 10 = 40 $/MWh (carbón sube poco)
+            },
+            "voll_value":               3000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+        },
     },
-    "☀️ Renovables gratis": {
-        "desc":   "Solar y eólica con costo variable = 0 (LCOE amortizado o subsidio total).",
-        "lesson": "Las renovables saturan su capacidad antes que cualquier fósil. Aparece curtailment en horas de alta irradiación. El precio marginal cae a cero en esas horas.",
-        "costs":  {**DEFAULT_COSTS, "solar": 0, "onwind": 0, "hydro": 0,
-                   "solar_thermal": 0, "geothermal": 0, "biogas": 0, "biomass": 0},
+    "☀️ Renewables Boom 2026": {
+        "desc":   "Expansión renovable 2026: más capacidad solar y eólica instalada por sistema (×1.4–×1.8). Perfiles horarios iguales, pero más MW disponibles.",
+        "lesson": "Agregar MW renovables no garantiza aprovechamiento total. Aparece más curtailment en horas de alta producción cuando la demanda no absorbe toda la oferta. La flexibilidad del sistema es clave.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder":      {},
+            "voll_value":               3000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+            "capacity_multiplier": {
+                "SIN": {"solar": 1.6, "wind": 1.4},
+                "BCA": {"solar": 1.4, "wind": 1.2},
+                "BCS": {"solar": 1.8, "wind": 1.3},
+            },
+        },
     },
-    "🌵 Crisis BCA (sin gas)": {
-        "desc":   "Gas en BCA a precio extremo — escasez severa de combustible en la península norte.",
-        "lesson": "BCA depende casi 100% de gas. Sin él, el precio marginal explota (= VoLL) y hay carga no servida visible.",
-        "costs":  {**DEFAULT_COSTS, "gas_ccgt": 500, "gas_ocgt": 600, "steam_other": 400},
+    "🔧 Forced Outage – BCS Diésel": {
+        "desc":   "Falla forzada: 35% de la capacidad diésel de BCS queda fuera de servicio. BCS depende del diésel como respaldo firme. VoLL sube a $5 000/MWh para enfatizar la escasez.",
+        "lesson": "La pérdida de capacidad firme puede disparar costos y afectar confiabilidad, especialmente en sistemas aislados como BCS. El precio marginal refleja directamente la falta de alternativas.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder":      {},
+            "voll_value":               5000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+            "forced_outage": {
+                "enabled":                True,
+                "system":                 "BCS",
+                "technology":             "diesel",   # alias → diesel_engine
+                "capacity_loss_fraction": 0.35,
+            },
+        },
     },
-    "🌱 Precio al carbono ($100/tCO₂)": {
-        "desc":   "Impuesto implícito de $100 USD/tCO₂. Factores: CCGT=0.37, OCGT=0.50, Termoeléctrica=0.82, Diesel=0.70 tCO₂/MWh.",
-        "lesson": "Con precio al carbono, la termoeléctrica y el diesel se encarecen. El gas CCGT sigue competitivo; hidro y renovables ganan terreno.",
-        "costs":  {**DEFAULT_COSTS, "gas_ccgt": 87, "gas_ocgt": 120,
-                   "steam_other": 112, "diesel_engine": 170, "chp": 70},
+    "🔋 Add Storage – Flexibility": {
+        "desc":   "Instala baterías en los tres sistemas: SIN 600 MW / 2 400 MWh, BCA 150 MW / 600 MWh, BCS 100 MW / 400 MWh. Eficiencia ida y vuelta 95%, SOC cíclico.",
+        "lesson": "La batería vale más cuando hay spreads de precios, picos de demanda o excedentes renovables. Reduce curtailment, suaviza picos de precio marginal y puede evitar shedding.",
+        "params": {
+            "marginal_cost_multiplier":      {},
+            "marginal_cost_adder":           {},
+            "voll_value":                    3000,
+            "demand_multiplier":             {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+            "battery_enable":                True,
+            "battery_power_mw":              {"SIN": 600, "BCA": 150, "BCS": 100},
+            "battery_energy_mwh":            {"SIN": 2400, "BCA": 600, "BCS": 400},
+            "battery_efficiency_store":      0.95,
+            "battery_efficiency_dispatch":   0.95,
+            "battery_initial_soc":           0.5,
+            "battery_cyclic_state_of_charge": True,
+        },
+    },
+    "🔴 VOLL Alto ($10 000)": {
+        "desc":   "VoLL = $10 000/MWh — política de confiabilidad estricta. El modelo prefiere usar generación carísima antes que cortar carga.",
+        "lesson": "Con VoLL alto, el shedding es el último recurso. Sube el uso de térmicas de respaldo y el costo total; la confiabilidad tiene un precio implícito muy alto.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder":      {},
+            "voll_value":               10_000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+        },
+    },
+    "🟡 VOLL Bajo ($2 000)": {
+        "desc":   "VoLL = $2 000/MWh — política de confiabilidad laxa. El modelo puede sheddear antes si producir cuesta demasiado.",
+        "lesson": "Con VoLL bajo, el shedding compite directamente con las térmicas caras. Aparece carga no servida cuando el costo marginal supera $2 000/MWh. La confiabilidad es una decisión política.",
+        "params": {
+            "marginal_cost_multiplier": {},
+            "marginal_cost_adder":      {},
+            "voll_value":               2_000,
+            "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
+        },
     },
 }
 SCENARIO_NAMES = list(SCENARIOS.keys())
@@ -137,6 +230,12 @@ GROWTH_TOTAL_MW = sum(r[3] for r in GROWTH_2026)
 
 RENEWABLE_CARRIERS = {"solar", "onwind", "solar_thermal", "geothermal", "hydro"}
 SYSTEM_COLORS = {"SIN": "#2563EB", "BCA": "#16A34A", "BCS": "#EA580C"}
+
+# Carrier alias map: scenario-facing names → internal carrier keys
+CARRIER_ALIAS: dict[str, str] = {
+    "wind":   "onwind",
+    "diesel": "diesel_engine",
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Cached data loaders
@@ -257,8 +356,11 @@ st.caption("Cada botón carga automáticamente los costos variables correspondie
 scen_cols = st.columns(len(SCENARIO_NAMES))
 for i, sname in enumerate(SCENARIO_NAMES):
     if scen_cols[i].button(sname, use_container_width=True, key=f"btn_scen_{i}"):
-        for carrier, cost in SCENARIOS[sname]["costs"].items():
-            st.session_state[f"cost_{carrier}"] = cost
+        effective = compute_effective_costs(SCENARIOS[sname]["params"])
+        for carrier, cost in effective.items():
+            st.session_state[f"cost_{carrier}"] = int(round(cost))
+        voll_override = SCENARIOS[sname]["params"].get("voll_value", VOLL_DEFAULT)
+        st.session_state["voll_input"] = voll_override
         st.session_state["active_scenario"] = sname
 
 active_scenario: str | None = st.session_state.get("active_scenario")
@@ -288,9 +390,13 @@ with col_ctrl:
         value=False,
         help="Añade nueva capacidad de acuerdo con PRODESEN 2026-2030 / CFE Plan de Expansión.",
     )
+    if "voll_input" not in st.session_state:
+        st.session_state["voll_input"] = VOLL_DEFAULT
     voll_input = st.number_input(
         "VoLL — carga no servida ($/MWh)",
-        value=VOLL_DEFAULT, min_value=100, max_value=10_000, step=100,
+        value=st.session_state["voll_input"],
+        min_value=100, max_value=10_000, step=100,
+        key="voll_input",
         help="Value of Lost Load: costo que representa 1 MWh de demanda no atendida. "
              "Cuando el VoLL se despacha, hay blackout parcial.",
     )
@@ -349,18 +455,40 @@ with st.expander("📋 Capacidad instalada por tecnología y sistema", expanded=
 with st.expander("③ 🎚️ Costos variables por tecnología ($/MWh)", expanded=True):
     st.caption(
         "Ajusta manualmente o usa un escenario predefinido. "
-        "Los sliders afectan el orden de mérito y, por tanto, el despacho y el precio sombra."
+        "Los sliders afectan el orden de mérito y, por tanto, el despacho y el precio sombra. "
+        "🔵 = costo sube vs. base  •  🔴 = costo baja vs. base"
     )
     sl_cols = st.columns(4)
-    costs: dict[str, int] = {}
+    costs: dict[str, float] = {}
     for i, carrier in enumerate(carriers_present):
-        label = CARRIER_LABELS.get(carrier, carrier)
-        costs[carrier] = sl_cols[i % 4].slider(
-            label,
-            min_value=0,
-            max_value=500,
-            key=f"cost_{carrier}",
-        )
+        label     = CARRIER_LABELS.get(carrier, carrier)
+        default_v = DEFAULT_COSTS.get(carrier, 0)
+        current_v = st.session_state.get(f"cost_{carrier}", default_v)
+
+        with sl_cols[i % 4]:
+            # Colored badge above slider when value differs from default
+            if current_v > default_v:
+                diff = current_v - default_v
+                st.markdown(
+                    f'<div style="font-size:11px;color:#1D4ED8;background:#DBEAFE;'
+                    f'display:inline-block;padding:1px 7px;border-radius:4px;'
+                    f'font-weight:600;margin-bottom:2px;">↑ +{diff:.0f} $/MWh</div>',
+                    unsafe_allow_html=True,
+                )
+            elif current_v < default_v:
+                diff = default_v - current_v
+                st.markdown(
+                    f'<div style="font-size:11px;color:#B91C1C;background:#FEE2E2;'
+                    f'display:inline-block;padding:1px 7px;border-radius:4px;'
+                    f'font-weight:600;margin-bottom:2px;">↓ -{diff:.0f} $/MWh</div>',
+                    unsafe_allow_html=True,
+                )
+            costs[carrier] = st.slider(
+                label,
+                min_value=0,
+                max_value=700,
+                key=f"cost_{carrier}",
+            )
 
 run_btn = st.button("▶ Correr despacho", type="primary")
 st.divider()
@@ -372,9 +500,13 @@ def build_and_solve(
     centrales: pd.DataFrame,
     p_max_pu_raw: pd.DataFrame,
     dem_z: pd.DataFrame,
-    costs: dict[str, int],
+    costs: dict[str, float],
     use_growth: bool,
     voll: float,
+    demand_mult: dict[str, float] | None = None,
+    capacity_mult: dict | None = None,
+    forced_outage: dict | None = None,
+    battery_config: dict | None = None,
 ) -> pypsa.Network:
     n = pypsa.Network()
     snapshots = dem_z.index
@@ -427,6 +559,52 @@ def build_and_solve(
             p_nom=1e6, marginal_cost=float(voll),
         )
 
+    # Capacity multipliers — scale p_nom of specific carriers per bus
+    if capacity_mult:
+        for bus, carrier_mults in capacity_mult.items():
+            for carrier_alias, mult in carrier_mults.items():
+                carrier = CARRIER_ALIAS.get(carrier_alias, carrier_alias)
+                mask = (n.generators["bus"] == bus) & (n.generators["carrier"] == carrier)
+                n.generators.loc[mask, "p_nom"] *= float(mult)
+
+    # Forced outage — derate a specific technology in a specific system
+    fo = forced_outage or {}
+    if fo.get("enabled", False):
+        fo_bus     = fo.get("system", "")
+        fo_alias   = fo.get("technology", "")
+        fo_carrier = CARRIER_ALIAS.get(fo_alias, fo_alias)
+        fo_loss    = float(fo.get("capacity_loss_fraction", 0.0))
+        if fo_bus and fo_carrier and 0.0 < fo_loss <= 1.0:
+            mask = (n.generators["bus"] == fo_bus) & (n.generators["carrier"] == fo_carrier)
+            n.generators.loc[mask, "p_nom"] *= (1.0 - fo_loss)
+
+    # Battery storage units (StorageUnit per bus)
+    bc = battery_config or {}
+    if bc.get("battery_enable", False):
+        eff_store    = float(bc.get("battery_efficiency_store", 0.95))
+        eff_dispatch = float(bc.get("battery_efficiency_dispatch", 0.95))
+        init_soc_frac = float(bc.get("battery_initial_soc", 0.5))
+        cyclic_soc   = bool(bc.get("battery_cyclic_state_of_charge", True))
+        power_mw     = bc.get("battery_power_mw", {})
+        energy_mwh   = bc.get("battery_energy_mwh", {})
+        for s in SISTEMAS:
+            p_nom_bat = float(power_mw.get(s, 0))
+            e_mwh_bat = float(energy_mwh.get(s, 0))
+            if p_nom_bat > 0 and e_mwh_bat > 0:
+                max_hours = e_mwh_bat / p_nom_bat
+                n.add(
+                    "StorageUnit",
+                    name=f"battery_{s}",
+                    bus=s,
+                    carrier="battery",
+                    p_nom=p_nom_bat,
+                    max_hours=max_hours,
+                    efficiency_store=eff_store,
+                    efficiency_dispatch=eff_dispatch,
+                    state_of_charge_initial=init_soc_frac * p_nom_bat * max_hours,
+                    cyclic_state_of_charge=cyclic_soc,
+                )
+
     # Time-varying p_max_pu profiles (only for generators present in Perfil CSV)
     profile_gens = [g for g in n.generators.index if g in p_max_pu_aligned.columns]
     if profile_gens:
@@ -440,13 +618,33 @@ def build_and_solve(
     # Loads
     for s in SISTEMAS:
         if s in dem_z.columns:
-            n.add("Load", f"load_{s}", bus=s, p_set=dem_z[s])
+            mult = demand_mult.get(s, 1.0) if demand_mult else 1.0
+            n.add("Load", f"load_{s}", bus=s, p_set=dem_z[s] * mult)
 
     n.optimize(solver_name="highs")
     return n
 
 
 if run_btn:
+    # Extract scenario-level params
+    _demand_mult: dict[str, float] | None = None
+    _capacity_mult: dict | None = None
+    _forced_outage: dict | None = None
+    _battery_config: dict | None = None
+    if active_scenario and active_scenario in SCENARIOS:
+        _sc_params = SCENARIOS[active_scenario]["params"]
+        _dm = _sc_params.get("demand_multiplier", {})
+        if any(v != 1.0 for v in _dm.values()):
+            _demand_mult = _dm
+        _cm = _sc_params.get("capacity_multiplier", {})
+        if _cm:
+            _capacity_mult = _cm
+        _fo = _sc_params.get("forced_outage", {})
+        if _fo.get("enabled", False):
+            _forced_outage = _fo
+        if _sc_params.get("battery_enable", False):
+            _battery_config = _sc_params
+
     with st.spinner("Optimizando con HiGHS… puede tardar ~30 s para períodos largos."):
         try:
             n_solved = build_and_solve(
@@ -456,10 +654,35 @@ if run_btn:
                 costs,
                 growth_2026,
                 float(voll_input),
+                demand_mult=_demand_mult,
+                capacity_mult=_capacity_mult,
+                forced_outage=_forced_outage,
+                battery_config=_battery_config,
             )
         except Exception as e:
             st.exception(e)
             st.stop()
+
+        # Auto-run base scenario for comparison whenever not running base
+        _is_base = (active_scenario == BASE_SCENARIO_KEY)
+        if not _is_base:
+            try:
+                _base_costs = compute_effective_costs(SCENARIOS[BASE_SCENARIO_KEY]["params"])
+                n_base_solved = build_and_solve(
+                    centrales_base.copy(),
+                    p_max_pu_raw,
+                    dem_z,
+                    _base_costs,
+                    growth_2026,
+                    float(VOLL_DEFAULT),
+                    demand_mult=None,
+                    capacity_mult=None,
+                )
+                st.session_state["n_base_solved"] = n_base_solved
+            except Exception:
+                st.session_state.pop("n_base_solved", None)
+        else:
+            st.session_state["n_base_solved"] = n_solved
 
     st.session_state["n_solved"]        = n_solved
     st.session_state["dem_z_solved"]    = dem_z.copy()
@@ -530,6 +753,96 @@ k3.metric("Carga no servida (MWh)",
           delta_color="inverse")
 k4.metric("Curtailment renovables (MWh)", f"{curtailment_total:,.0f}")
 
+# ── Comparison vs. Base scenario ──────────────────────────────────────────────
+_n_base: pypsa.Network | None = st.session_state.get("n_base_solved")
+_show_comparison = (
+    _n_base is not None
+    and scen_label != BASE_SCENARIO_KEY
+)
+if _show_comparison:
+    with st.expander("⚖️ Comparación vs. Caso Base", expanded=True):
+        _b_dispatch  = _n_base.generators_t.p.copy()
+        _b_voll_gens = [g for g in _b_dispatch.columns if g.startswith("VoLL_")]
+        _b_shadow    = _n_base.buses_t.marginal_price
+
+        _b_cost    = _n_base.objective
+        _b_gen     = _b_dispatch.drop(columns=_b_voll_gens, errors="ignore").sum().sum()
+        _b_shed    = _b_dispatch[_b_voll_gens].sum().sum() if _b_voll_gens else 0.0
+
+        # Base curtailment total
+        _b_curt_total = 0.0
+        if not _n_base.generators_t.p_max_pu.empty:
+            _b_gen_info = _n_base.generators[["bus", "carrier"]].copy()
+            _b_ren_gens = [
+                g for g in _n_base.generators_t.p_max_pu.columns
+                if g in _b_gen_info.index and _b_gen_info.loc[g, "carrier"] in RENEWABLE_CARRIERS
+            ]
+            if _b_ren_gens:
+                _b_avail = _n_base.generators_t.p_max_pu[_b_ren_gens].multiply(
+                    _n_base.generators.loc[_b_ren_gens, "p_nom"]
+                )
+                _b_disp  = _n_base.generators_t.p.reindex(columns=_b_ren_gens, fill_value=0.0)
+                _b_curt_total = (_b_avail - _b_disp).clip(lower=0).sum().sum()
+
+        _s_gen   = dispatch.drop(columns=voll_gens, errors="ignore").sum().sum()
+        delta_cost  = n.objective - _b_cost
+        delta_gen   = _s_gen - _b_gen
+        delta_shed  = shedding_total - _b_shed
+        delta_curt  = curtailment_total - _b_curt_total
+
+        def _fmt_delta(val: float, invert: bool = False) -> str:
+            sign = "+" if val >= 0 else ""
+            arrow = ("↑" if val > 0 else "↓") if abs(val) > 0.5 else "="
+            if invert:
+                arrow = ("↑" if val > 0 else "↓") if abs(val) > 0.5 else "="
+            return f"{arrow} {sign}{val:,.0f}"
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(
+            "Δ Costo total ($)",
+            f"{n.objective:,.0f}",
+            delta=_fmt_delta(delta_cost, invert=True),
+            delta_color="inverse",
+            help=f"Base: ${_b_cost:,.0f}",
+        )
+        c2.metric(
+            "Δ Generación (MWh)",
+            f"{_s_gen:,.0f}",
+            delta=_fmt_delta(delta_gen),
+            delta_color="normal",
+            help=f"Base: {_b_gen:,.0f} MWh",
+        )
+        c3.metric(
+            "Δ Carga no servida (MWh)",
+            f"{shedding_total:,.0f}",
+            delta=_fmt_delta(delta_shed, invert=True),
+            delta_color="inverse",
+            help=f"Base: {_b_shed:,.0f} MWh",
+        )
+        c4.metric(
+            "Δ Curtailment (MWh)",
+            f"{curtailment_total:,.0f}",
+            delta=_fmt_delta(delta_curt),
+            delta_color="normal",
+            help=f"Base: {_b_curt_total:,.0f} MWh",
+        )
+
+        # Per-system shadow price comparison
+        st.markdown("**Precio marginal nodal promedio ($/MWh)**")
+        sp_cmp_cols = st.columns(len(SISTEMAS))
+        for idx_s, s in enumerate(SISTEMAS):
+            if s in shadow_prices.columns and s in _b_shadow.columns:
+                sc_avg  = shadow_prices[s].mean()
+                bc_avg  = _b_shadow[s].mean()
+                d_avg   = sc_avg - bc_avg
+                sp_cmp_cols[idx_s].metric(
+                    s,
+                    f"{sc_avg:,.1f} $/MWh",
+                    delta=f"{'+'if d_avg>=0 else ''}{d_avg:,.1f} vs base",
+                    delta_color="inverse",
+                    help=f"Base: {bc_avg:,.1f} $/MWh",
+                )
+
 st.divider()
 
 # ── Helper: dispatch stacked-area chart ───────────────────────────────────────
@@ -545,6 +858,12 @@ def dispatch_chart(bus: str, title: str) -> None:
         disp_carrier = dispatch[bus_gens].T.groupby(carrier_map).sum().T
     else:
         disp_carrier = pd.DataFrame(index=n.snapshots)
+
+    # Add battery net dispatch (positive = discharge, negative = charge)
+    bat_col = f"battery_{bus}"
+    if not n.storage_units.empty and bat_col in n.storage_units.index:
+        if bat_col in n.storage_units_t.p.columns:
+            disp_carrier["battery"] = n.storage_units_t.p[bat_col]
 
     # Append shedding if any
     voll_col = f"VoLL_{bus}"
