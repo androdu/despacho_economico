@@ -60,12 +60,12 @@ def fetch_sistema(sistema: str, target_date: date, timeout: int = 30) -> pd.Data
     df = pd.DataFrame(data)
 
     # Renombrar columnas
-    rename = {"hora": "hora", "valorDemanda": "demanda_mw"}
+    rename = {"hora": "hora", "valorDemanda": "demand_mw"}
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
     df["hora"] = pd.to_numeric(df.get("hora", pd.Series(dtype=float)), errors="coerce")
-    df["demanda_mw"] = pd.to_numeric(df.get("demanda_mw", pd.Series(dtype=float)), errors="coerce")
-    df = df.dropna(subset=["hora", "demanda_mw"])
+    df["demand_mw"] = pd.to_numeric(df.get("demand_mw", pd.Series(dtype=float)), errors="coerce")
+    df = df.dropna(subset=["hora", "demand_mw"])
     df = df.sort_values("hora").reset_index(drop=True)
 
     op_date = pd.Timestamp(target_date)
