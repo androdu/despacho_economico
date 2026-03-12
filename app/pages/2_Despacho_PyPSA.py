@@ -632,15 +632,19 @@ def build_and_solve(
                 )
 
     # Time-varying p_max_pu profiles (only for generators present in Perfil CSV)
+    # Fill strategy: VRE (solar/wind) → 0.0 (no sun/wind = no generation)
+    #                dispatchable (hydro, gas, etc.) → 1.0 (assume full availability when data missing)
     profile_gens = [g for g in n.generators.index if g in p_max_pu_aligned.columns]
     if profile_gens:
-        p_max_pu = (
-            p_max_pu_aligned[profile_gens]
-            .reindex(index=snapshots)
-            .fillna(0.0)
-            .clip(0.0, 1.0)
-        )
-        n.generators_t.p_max_pu = p_max_pu
+        gen_carrier_map = n.generators.loc[profile_gens, "carrier"]
+        p_raw = p_max_pu_aligned[profile_gens].reindex(index=snapshots)
+        vre_cols  = [g for g in profile_gens if gen_carrier_map[g] in VRE_CARRIERS]
+        firm_cols = [g for g in profile_gens if gen_carrier_map[g] not in VRE_CARRIERS]
+        if vre_cols:
+            p_raw[vre_cols]  = p_raw[vre_cols].fillna(0.0)
+        if firm_cols:
+            p_raw[firm_cols] = p_raw[firm_cols].fillna(1.0)
+        n.generators_t.p_max_pu = p_raw.clip(0.0, 1.0)
 
     # Loads
     for s in SISTEMAS:
