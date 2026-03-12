@@ -73,7 +73,7 @@ CARRIER_COLORS = {
 
 # Default marginal costs ($/MWh) — based on CFE/CENACE reference
 DEFAULT_COSTS: dict[str, float] = {
-    "hydro":         0,
+    "hydro":         8,
     "nuclear":       5,
     "solar":         0,
     "onwind":        0,
@@ -232,7 +232,7 @@ GROWTH_2026: list[tuple[str, str, str, float]] = [
 ]
 GROWTH_TOTAL_MW = sum(r[3] for r in GROWTH_2026)
 
-RENEWABLE_CARRIERS = {"solar", "onwind", "solar_thermal", "geothermal", "hydro"}
+VRE_CARRIERS = {"solar", "onwind"}  # Variable renewable energy: curtailment-eligible only
 SYSTEM_COLORS = {"SIN": "#2563EB", "BCA": "#16A34A", "BCS": "#EA580C"}
 
 # Carrier alias map: scenario-facing names → internal carrier keys
@@ -636,7 +636,8 @@ def build_and_solve(
     if profile_gens:
         p_max_pu = (
             p_max_pu_aligned[profile_gens]
-            .reindex(index=snapshots, fill_value=1.0)
+            .reindex(index=snapshots)
+            .fillna(0.0)
             .clip(0.0, 1.0)
         )
         n.generators_t.p_max_pu = p_max_pu
@@ -737,16 +738,16 @@ shadow_prices: pd.DataFrame = n.buses_t.marginal_price
 curtailment_by_bus: dict[str, pd.DataFrame] = {}
 if not n.generators_t.p_max_pu.empty:
     profile_gens_solved = n.generators_t.p_max_pu.columns.tolist()
-    # Filter to renewable carriers only
-    ren_profile_gens = [
+    # Filter to VRE carriers only (solar/wind): curtailment is only meaningful for variable renewables
+    vre_profile_gens = [
         g for g in profile_gens_solved
-        if g in gen_info.index and gen_info.loc[g, "carrier"] in RENEWABLE_CARRIERS
+        if g in gen_info.index and gen_info.loc[g, "carrier"] in VRE_CARRIERS
     ]
-    if ren_profile_gens:
-        p_avail = n.generators_t.p_max_pu[ren_profile_gens].multiply(
-            n.generators.loc[ren_profile_gens, "p_nom"]
+    if vre_profile_gens:
+        p_avail = n.generators_t.p_max_pu[vre_profile_gens].multiply(
+            n.generators.loc[vre_profile_gens, "p_nom"]
         )
-        p_disp_ren = n.generators_t.p.reindex(columns=ren_profile_gens, fill_value=0.0)
+        p_disp_ren = n.generators_t.p.reindex(columns=vre_profile_gens, fill_value=0.0)
         curt_df = (p_avail - p_disp_ren).clip(lower=0)
         curt_df = curt_df.loc[:, curt_df.sum() > 0.1]
         for s in SISTEMAS:
@@ -801,7 +802,7 @@ if _show_comparison:
             _b_gen_info = _n_base.generators[["bus", "carrier"]].copy()
             _b_ren_gens = [
                 g for g in _n_base.generators_t.p_max_pu.columns
-                if g in _b_gen_info.index and _b_gen_info.loc[g, "carrier"] in RENEWABLE_CARRIERS
+                if g in _b_gen_info.index and _b_gen_info.loc[g, "carrier"] in VRE_CARRIERS
             ]
             if _b_ren_gens:
                 _b_avail = _n_base.generators_t.p_max_pu[_b_ren_gens].multiply(
