@@ -50,21 +50,21 @@ CARRIER_LABELS = {
     "shedding":      "Carga no servida",
 }
 CARRIER_COLORS = {
-    "hydro":         "#2563EB",
-    "nuclear":       "#7C3AED",
-    "solar":         "#FBBF24",
+    "hydro":         "#0051FF",
+    "nuclear":       "#FF0000",
+    "solar":         "#FFB700",
     "onwind":        "#10B981",
-    "solar_thermal": "#F59E0B",
-    "geothermal":    "#8B5CF6",
-    "biogas":        "#6EE7B7",
-    "biomass":       "#34D399",
-    "chp":           "#9CA3AF",
-    "gas_ccgt":      "#F97316",
+    "solar_thermal": "#FBDC60",
+    "geothermal":    "#CDC1E9",
+    "biogas":        "#446F12",
+    "biomass":       "#0A5137",
+    "chp":           "#393E47",
+    "gas_ccgt":      "#441F05",
     "gas_ocgt":      "#FB923C",
     "steam_other":   "#78716C",
     "diesel_engine": "#EF4444",
     "battery":       "#06B6D4",
-    "shedding":      "#DC2626",
+    "shedding":      "#500E0E",
 }
 
 # Default marginal costs ($/MWh) — based on CFE/CENACE reference
