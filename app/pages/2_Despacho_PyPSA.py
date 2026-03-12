@@ -16,7 +16,8 @@ ROOT          = Path(__file__).resolve().parents[2]
 DATA_CLEAN    = ROOT / "data_clean"
 CENTRALES_CSV = DATA_CLEAN / "generators" / "Centrales_gen_mx.csv"
 PERFIL_CSV    = DATA_CLEAN / "generators" / "Perfil_Generaciom.csv"
-DEMAND_RAW_DIR = ROOT / "data_raw" / "demand" / "balance_2026"
+DEMAND_RAW_DIR  = ROOT / "data_raw" / "demand" / "balance_2026"
+DEMAND_API_DIR  = ROOT / "data_raw" / "demand" / "daily_api"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Constants
@@ -66,6 +67,9 @@ CARRIER_COLORS = {
     "battery":       "#06B6D4",
     "shedding":      "#500E0E",
 }
+
+
+
 
 # Default marginal costs ($/MWh) — based on CFE/CENACE reference
 DEFAULT_COSTS: dict[str, float] = {
@@ -260,6 +264,8 @@ def load_profiles() -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def load_demand_raw() -> pd.DataFrame:
     all_dfs = []
+
+    # ── 1. CSVs oficiales de balance CENACE ───────────────────────────────────
     for f in sorted(DEMAND_RAW_DIR.glob("*.csv")):
         with open(f, encoding="latin-1") as fh:
             header_lines = [fh.readline() for _ in range(8)]
@@ -274,8 +280,8 @@ def load_demand_raw() -> pd.DataFrame:
             continue
         df = df[[col_s, col_h, col_d]].copy()
         df.columns = ["zona", "hora", "demand_mw"]
-        df["zona"]     = df["zona"].astype(str).str.strip().str.strip('"').str.upper()
-        df["hora"]     = pd.to_numeric(df["hora"], errors="coerce")
+        df["zona"]      = df["zona"].astype(str).str.strip().str.strip('"').str.upper()
+        df["hora"]      = pd.to_numeric(df["hora"], errors="coerce")
         df["demand_mw"] = pd.to_numeric(
             df["demand_mw"].astype(str).str.strip().str.replace(",", ""), errors="coerce"
         )
@@ -283,11 +289,31 @@ def load_demand_raw() -> pd.DataFrame:
         df["snapshot"] = op_date + pd.to_timedelta(df["hora"].astype(int) - 1, unit="h")
         all_dfs.append(df[["snapshot", "zona", "demand_mw"]])
 
+    # ── 2. CSVs de la API diaria (fetch_daily_demand.py / GitHub Action) ──────
+    if DEMAND_API_DIR.exists():
+        for f in sorted(DEMAND_API_DIR.glob("demand_*.csv")):
+            try:
+                df = pd.read_csv(f, parse_dates=["snapshot"])
+                df["zona"]      = df["zona"].astype(str).str.upper()
+                df["demand_mw"] = pd.to_numeric(df["demand_mw"], errors="coerce")
+                df = df.dropna(subset=["snapshot", "zona", "demand_mw"])
+                all_dfs.append(df[["snapshot", "zona", "demand_mw"]])
+            except Exception:
+                continue
+
     if not all_dfs:
         raise ValueError(f"No se encontraron archivos de demanda en {DEMAND_RAW_DIR}")
 
-    dem = pd.concat(all_dfs, ignore_index=True).sort_values("snapshot").reset_index(drop=True)
+    dem = pd.concat(all_dfs, ignore_index=True)
     dem["zona"] = dem["zona"].replace({"BSA": "BCA"})
+
+    # Deduplicar: si un día tiene datos en balance oficial Y en daily_api,
+    # el balance oficial tiene prioridad (viene primero por orden de concatenación)
+    dem = (
+        dem.drop_duplicates(subset=["snapshot", "zona"], keep="first")
+        .sort_values("snapshot")
+        .reset_index(drop=True)
+    )
     return dem
 
 # ──────────────────────────────────────────────────────────────────────────────
