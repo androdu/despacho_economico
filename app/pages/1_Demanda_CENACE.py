@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import date, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from pathlib import Path
 from lib.cenace_client import fetch_demand, fetch_demand_batch, CACHE_DIR
 
 SERIES_LABELS = {
@@ -17,10 +19,15 @@ COLORS_ACTIVE = {
 SYSTEM_COLORS = {"SIN": "#2563EB", "BCA": "#16A34A", "BCS": "#EA580C"}
 COLOR_GREY = "rgba(160,160,160,0.35)"
 
+MX_TZ = ZoneInfo("America/Mexico_City")
+HIST_DIR = Path("data_clean")
+HIST_PATH = HIST_DIR / "demanda_historica.parquet"
+
 st.title("Demanda CENACE")
 st.caption(
     "Datos del día actual. La API de CENACE (`obtieneValoresTotal`) solo expone la jornada en curso. "
-    "El **caching** guarda el resultado en disco por día; el **batching** descarga los 3 sistemas en un solo clic."
+    "El **cache** acelera consultas por entorno; el **histórico consolidado** guarda datos persistentes "
+    "para que la app local y la app en línea muestren la misma serie."
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -146,48 +153,117 @@ def render_system_panel(df: pd.DataFrame, sys_label: str, res=None) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helpers — histórico desde cache
+# Helpers — histórico consolidado persistente
 # ─────────────────────────────────────────────────────────────────────────────
-def load_last_7_days() -> pd.DataFrame:
-    """Lee todos los parquets del cache y devuelve los últimos 7 días."""
-    cutoff = date.today() - timedelta(days=7)
-    frames = []
-    for f in sorted(CACHE_DIR.glob("demanda_*.parquet")):
-        # filename: demanda_{SISTEMA}_{hash}.parquet
-        parts = f.stem.split("_")
-        if len(parts) < 3:
-            continue
-        sistema = parts[1]
-        try:
-            df_c = pd.read_parquet(f)
-            if "fecha" not in df_c.columns or df_c.empty:
-                continue
-            fecha_val = pd.to_datetime(df_c["fecha"].iloc[0]).date()
-            if fecha_val < cutoff:
-                continue
-            df_c = df_c.copy()
-            df_c["sistema"] = sistema
-            frames.append(df_c)
-        except Exception:
-            continue
-    if not frames:
-        return pd.DataFrame()
-    combined = pd.concat(frames, ignore_index=True)
-    # Reconstruir timestamp si no existe
-    if "timestamp" not in combined.columns and "fecha" in combined.columns and "hora" in combined.columns:
-        combined["timestamp"] = (
-            pd.to_datetime(combined["fecha"])
-            + pd.to_timedelta(pd.to_numeric(combined["hora"], errors="coerce") - 1, unit="h")
+def ensure_history_dir() -> None:
+    HIST_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def normalize_history_df(df: pd.DataFrame, sistema: str | None = None) -> pd.DataFrame:
+    """Normaliza dataframe para histórico consolidado."""
+    out = df.copy()
+
+    if sistema is not None and "sistema" not in out.columns:
+        out["sistema"] = sistema
+
+    if "fecha" in out.columns:
+        out["fecha"] = pd.to_datetime(out["fecha"], errors="coerce").dt.date
+
+    if "hora" in out.columns:
+        out["hora"] = pd.to_numeric(out["hora"], errors="coerce")
+
+    for col in ["demanda_mw", "generacion_mw", "pronostico_mw"]:
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce")
+
+    if "timestamp" not in out.columns and {"fecha", "hora"}.issubset(out.columns):
+        out["timestamp"] = (
+            pd.to_datetime(out["fecha"], errors="coerce")
+            + pd.to_timedelta(out["hora"] - 1, unit="h")
         )
-    return combined
+
+    cols_order = [
+        "sistema", "fecha", "hora", "timestamp",
+        "demanda_mw", "generacion_mw", "pronostico_mw"
+    ]
+    existing = [c for c in cols_order if c in out.columns]
+    remaining = [c for c in out.columns if c not in existing]
+    out = out[existing + remaining]
+
+    return out
+
+
+def save_to_history(df: pd.DataFrame, sistema: str) -> None:
+    """Guarda/actualiza datos en el histórico consolidado."""
+    ensure_history_dir()
+
+    new_df = normalize_history_df(df, sistema=sistema)
+
+    required_cols = [c for c in ["sistema", "fecha", "hora"] if c in new_df.columns]
+    if len(required_cols) < 3:
+        return
+
+    new_df = new_df.dropna(subset=required_cols)
+    if new_df.empty:
+        return
+
+    if HIST_PATH.exists():
+        try:
+            hist_df = pd.read_parquet(HIST_PATH)
+            hist_df = normalize_history_df(hist_df)
+        except Exception:
+            hist_df = pd.DataFrame()
+    else:
+        hist_df = pd.DataFrame()
+
+    combined = pd.concat([hist_df, new_df], ignore_index=True)
+
+    combined = combined.dropna(subset=["sistema", "fecha", "hora"])
+    combined = (
+        combined.sort_values(["sistema", "fecha", "hora"])
+        .drop_duplicates(subset=["sistema", "fecha", "hora"], keep="last")
+        .reset_index(drop=True)
+    )
+
+    if "timestamp" in combined.columns:
+        combined = combined.sort_values(["sistema", "timestamp"]).reset_index(drop=True)
+
+    combined.to_parquet(HIST_PATH, index=False)
+
+
+def load_history_last_7_days() -> pd.DataFrame:
+    """Carga el histórico consolidado y devuelve los últimos 7 días con base en hora CDMX."""
+    if not HIST_PATH.exists():
+        return pd.DataFrame()
+
+    try:
+        df = pd.read_parquet(HIST_PATH)
+    except Exception:
+        return pd.DataFrame()
+
+    df = normalize_history_df(df)
+
+    if "fecha" not in df.columns:
+        return pd.DataFrame()
+
+    today_mx = datetime.now(MX_TZ).date()
+    cutoff = today_mx - timedelta(days=7)
+
+    df = df.dropna(subset=["fecha"])
+    df = df[df["fecha"] >= cutoff].copy()
+
+    if "timestamp" in df.columns:
+        df = df.sort_values(["sistema", "timestamp"]).reset_index(drop=True)
+
+    return df
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sección 0: Histórico últimos 7 días (desde cache local)
 # ─────────────────────────────────────────────────────────────────────────────
-st.subheader("Histórico — últimos 7 días (cache local)")
+st.subheader("Histórico — últimos 7 días")
 
-hist_df = load_last_7_days()
+hist_df = load_history_last_7_days()
 
 if hist_df.empty:
     st.info("No hay datos en cache para los últimos 7 días. Descarga datos usando las secciones de abajo.")
@@ -244,7 +320,10 @@ with col2:
 if st.button("Descargar"):
     with st.spinner("Consultando CENACE..."):
         res = fetch_demand(system=system, use_cache=use_cache)
+
     df = to_clean_df(res.df)
+    save_to_history(df, system)
+
     st.session_state["demand_df"]     = df
     st.session_state["demand_df_raw"] = res.df
     st.session_state["demand_res"]    = res
@@ -299,7 +378,9 @@ if st.button("Descargar todos los sistemas seleccionados", type="primary"):
         for i, s in enumerate(batch_systems):
             prog.progress(i / n_sys, text=f"Descargando {s}… ({i+1}/{n_sys})")
             res_s = fetch_demand(system=s, use_cache=batch_use_cache)
-            batch_results[s] = (to_clean_df(res_s.df), res_s)
+            df_s = to_clean_df(res_s.df)
+            save_to_history(df_s, s)
+            batch_results[s] = (df_s, res_s)
         prog.progress(1.0, text="¡Descarga completada!")
         st.session_state["batch_results"] = batch_results
 

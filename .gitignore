@@ -1,4 +1,5 @@
 .venv/
 __pycache__/
 *.pyc
-data_cache/data_clean/generators/Perfil_Generaciom.csv
+data_cache/
+data_clean/generators/Perfil_Generaciom.csv
