@@ -147,7 +147,7 @@ def render_system_panel(df: pd.DataFrame, sys_label: str, res=None) -> None:
             yaxis=yaxis_cfg, height=300,
             margin=dict(l=0, r=0, t=20, b=0),
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key=f"chart_{sys_label}")
 
     # Tabla
     with st.expander("Tabla de datos", expanded=False):
@@ -303,7 +303,7 @@ with st.expander("Histórico — últimos 7 días", expanded=False):
             margin=dict(l=0, r=0, t=20, b=0),
             legend=dict(orientation="h", y=-0.18),
         )
-        st.plotly_chart(fig_hist, use_container_width=True)
+        st.plotly_chart(fig_hist, use_container_width=True, key="chart_hist")
 
 st.divider()
 
@@ -434,7 +434,7 @@ if "batch_results" in st.session_state:
                 margin=dict(l=0, r=0, t=20, b=0),
                 legend=dict(orientation="h", y=-0.15),
             )
-            st.plotly_chart(fig_cmp, use_container_width=True)
+            st.plotly_chart(fig_cmp, use_container_width=True, key="chart_cmp")
 
             # Tabla comparativa
             rows = []
