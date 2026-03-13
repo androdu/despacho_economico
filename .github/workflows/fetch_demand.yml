@@ -34,6 +34,7 @@ jobs:
 
       - name: "Paso 3: Descargar demanda del día actual (API en vivo)"
         run: python scripts/fetch_daily_demand.py --overwrite
+        continue-on-error: true   # CENACE API inestable; estimados del Paso 2 cubren el hueco
 
       - name: Commit y push si hay cambios
         run: |

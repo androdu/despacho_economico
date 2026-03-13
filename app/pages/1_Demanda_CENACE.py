@@ -263,49 +263,47 @@ def load_history_last_7_days() -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 # Sección 0: Histórico últimos 7 días (desde cache local)
 # ─────────────────────────────────────────────────────────────────────────────
-st.subheader("Histórico — últimos 7 días")
+with st.expander("Histórico — últimos 7 días", expanded=False):
+    hist_df = load_history_last_7_days()
 
-hist_df = load_history_last_7_days()
+    if hist_df.empty:
+        st.info("No hay datos en cache para los últimos 7 días. Descarga datos usando las secciones de abajo.")
+    else:
+        sistemas_hist = sorted(hist_df["sistema"].unique())
+        dias_hist = sorted(hist_df["fecha"].unique()) if "fecha" in hist_df.columns else []
+        h1, h2 = st.columns(2)
+        h1.caption(f"Sistemas con datos: **{', '.join(sistemas_hist)}**")
+        h2.caption(f"Días disponibles: **{len(dias_hist)}** ({dias_hist[0] if dias_hist else '—'} → {dias_hist[-1] if dias_hist else '—'})")
 
-if hist_df.empty:
-    st.info("No hay datos en cache para los últimos 7 días. Descarga datos usando las secciones de abajo.")
-else:
-    sistemas_hist = sorted(hist_df["sistema"].unique())
-    dias_hist = sorted(hist_df["fecha"].unique()) if "fecha" in hist_df.columns else []
-    h1, h2 = st.columns(2)
-    h1.caption(f"Sistemas con datos: **{', '.join(sistemas_hist)}**")
-    h2.caption(f"Días disponibles: **{len(dias_hist)}** ({dias_hist[0] if dias_hist else '—'} → {dias_hist[-1] if dias_hist else '—'})")
+        sistemas_sel = st.multiselect(
+            "Sistemas a mostrar",
+            options=sistemas_hist,
+            default=sistemas_hist,
+            key="hist_sistemas_sel",
+        )
 
-    # Selector de sistemas a mostrar
-    sistemas_sel = st.multiselect(
-        "Sistemas a mostrar",
-        options=sistemas_hist,
-        default=sistemas_hist,
-        key="hist_sistemas_sel",
-    )
-
-    fig_hist = go.Figure()
-    for s in sistemas_sel:
-        df_s = hist_df[hist_df["sistema"] == s].copy()
-        if "timestamp" not in df_s.columns or "demanda_mw" not in df_s.columns:
-            continue
-        df_s = df_s.dropna(subset=["timestamp", "demanda_mw"]).sort_values("timestamp")
-        fig_hist.add_trace(go.Scatter(
-            x=df_s["timestamp"],
-            y=df_s["demanda_mw"],
-            mode="lines",
-            name=s,
-            line=dict(color=SYSTEM_COLORS.get(s, "#888"), width=1.8),
-            hovertemplate=f"{s} — %{{x|%d %b %H:00}}: %{{y:,.0f}} MW<extra></extra>",
-        ))
-    fig_hist.update_layout(
-        xaxis=dict(tickformat="%d %b\n%H:%M", tickangle=0),
-        yaxis=dict(tickformat=",.0f", exponentformat="none"),
-        height=350,
-        margin=dict(l=0, r=0, t=20, b=0),
-        legend=dict(orientation="h", y=-0.18),
-    )
-    st.plotly_chart(fig_hist, use_container_width=True)
+        fig_hist = go.Figure()
+        for s in sistemas_sel:
+            df_s = hist_df[hist_df["sistema"] == s].copy()
+            if "timestamp" not in df_s.columns or "demanda_mw" not in df_s.columns:
+                continue
+            df_s = df_s.dropna(subset=["timestamp", "demanda_mw"]).sort_values("timestamp")
+            fig_hist.add_trace(go.Scatter(
+                x=df_s["timestamp"],
+                y=df_s["demanda_mw"],
+                mode="lines",
+                name=s,
+                line=dict(color=SYSTEM_COLORS.get(s, "#888"), width=1.8),
+                hovertemplate=f"{s} — %{{x|%d %b %H:00}}: %{{y:,.0f}} MW<extra></extra>",
+            ))
+        fig_hist.update_layout(
+            xaxis=dict(tickformat="%d %b\n%H:%M", tickangle=0),
+            yaxis=dict(tickformat=",.0f", exponentformat="none"),
+            height=350,
+            margin=dict(l=0, r=0, t=20, b=0),
+            legend=dict(orientation="h", y=-0.18),
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
 
 st.divider()
 

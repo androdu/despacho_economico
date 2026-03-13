@@ -8,6 +8,7 @@ import pandas as pd
 import pypsa
 import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths
@@ -81,10 +82,10 @@ DEFAULT_COSTS: dict[str, float] = {
     "geothermal":    10,
     "biogas":        15,
     "biomass":       20,
-    "chp":           35,
+    "chp":           50,
     "gas_ccgt":      50,
     "gas_ocgt":      70,
-    "steam_other":   30,
+    "steam_other":   65,
     "diesel_engine": 100,
 }
 
@@ -110,8 +111,13 @@ BASE_SCENARIO_KEY = "🏭 Base 2026"
 
 SCENARIOS: dict[str, dict] = {
     BASE_SCENARIO_KEY: {
-        "desc":   "Costos de referencia del SEN. Hidro y renovables despachan primero; el gas cubre la demanda residual.",
-        "lesson": "Gas domina BCA/BCS. En SIN, la hidro + eólica + solar son la base. Sin shocks externos.",
+        "desc":   "Costos de referencia del SEN. Renovables e hidro despachan primero; gas CCGT cubre la demanda residual; vapor es respaldo caro.",
+        "lesson": "Gas CCGT es el unit marginal en la mayoría de horas. Solar/eólica/hidro comprimen el precio en horas de alta generación renovable.",
+        "narrative": {
+            "cambio":   "Costos variables de referencia sin modificación. Gas CCGT = 50 $/MWh, vapor = 65 $/MWh.",
+            "observa":  "En el despacho: renovables ocupan la base de la pila; gas CCGT llena la demanda residual. En el precio marginal: ~50 $/MWh en horas de valle, cae a cero en horas de alta solar.",
+            "leccion":  "El **precio marginal** lo fija el último generador despachado (gas CCGT). Las renovables no tienen costo variable, así que reducen el precio cuando hay suficiente recurso — el fenómeno de *merit order effect*.",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder":      {},
@@ -126,16 +132,21 @@ SCENARIOS: dict[str, dict] = {
         },
     },
     "⛽ Fuel Price Shock": {
-        "desc":   "Encarecimiento de combustibles fósiles — gas sube más, carbón sube poco. Adders: CCGT +30, OCGT +40, CHP +25, Diésel +50, Carbón +10.",
+        "desc":   "Encarecimiento de combustibles fósiles — gas sube más, carbón sube poco. Adders: CCGT +30, OCGT +40, CHP +10, Diésel +50, Vapor +15.",
         "lesson": "Sube el costo total y el precio marginal nodal. Renovables e hidro se vuelven relativamente más atractivas. Si el sistema depende mucho de térmicas caras, puede aparecer shedding.",
+        "narrative": {
+            "cambio":   "Gas CCGT sube de 50 → 80 $/MWh, OCGT de 70 → 110, vapor de 65 → 80, diésel de 100 → 150. Las renovables e hidro **no cambian**.",
+            "observa":  "El precio marginal nodal sube en todos los sistemas. El mix de generación desplaza más trabajo a renovables e hidro. Compara el costo total vs. el caso base en el panel de comparación.",
+            "leccion":  "Un shock de combustible se transmite íntegramente al precio de mercado cuando las térmicas son el *unit marginal*. La penetración renovable actúa como amortiguador natural del precio.",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder": {
                 "gas_ccgt":      30,   # 50 + 30 = 80 $/MWh
                 "gas_ocgt":      40,   # 70 + 40 = 110 $/MWh
-                "chp":           25,   # 35 + 25 = 60 $/MWh
+                "chp":           10,   # 50 + 10 = 60 $/MWh
                 "diesel_engine": 50,   # 100 + 50 = 150 $/MWh
-                "steam_other":   10,   # 30 + 10 = 40 $/MWh (carbón sube poco)
+                "steam_other":   15,   # 65 + 15 = 80 $/MWh
             },
             "voll_value":               3000,
             "demand_multiplier":        {"SIN": 1.0, "BCA": 1.0, "BCS": 1.0},
@@ -144,6 +155,11 @@ SCENARIOS: dict[str, dict] = {
     "☀️ Renewables Boom 2026": {
         "desc":   "Expansión renovable 2026: más capacidad solar y eólica instalada por sistema (×1.4–×1.8). Perfiles horarios iguales, pero más MW disponibles.",
         "lesson": "Agregar MW renovables no garantiza aprovechamiento total. Aparece más curtailment en horas de alta producción cuando la demanda no absorbe toda la oferta. La flexibilidad del sistema es clave.",
+        "narrative": {
+            "cambio":   "Solar SIN ×1.6, eólica SIN ×1.4, solar BCA ×1.4, solar BCS ×1.8. Los **perfiles horarios no cambian** — solo aumenta la potencia instalada.",
+            "observa":  "El curtailment sube (tab por sistema → sección de curtailment). El precio marginal cae en horas solares. El costo total puede bajar aunque haya más capacidad sin usar.",
+            "leccion":  "Añadir MW renovables sin flexibilidad (almacenamiento, interconexión, demanda flexible) genera *curtailment* creciente. El valor marginal de cada MW adicional decrece — ley de rendimientos marginales decrecientes en VRE.",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder":      {},
@@ -157,8 +173,13 @@ SCENARIOS: dict[str, dict] = {
         },
     },
     "🔧 Forced Outage – BCS Diésel": {
-        "desc":   "Falla forzada: 35% de la capacidad diésel de BCS queda fuera de servicio. BCS depende del diésel como respaldo firme. VoLL sube a $5 000/MWh para enfatizar la escasez.",
+        "desc":   "Falla forzada: 35% de la capacidad diésel de BCS queda fuera de servicio. BCS depende del diésel como respaldo firme. VoLL sube a $5 000/MWh.",
         "lesson": "La pérdida de capacidad firme puede disparar costos y afectar confiabilidad, especialmente en sistemas aislados como BCS. El precio marginal refleja directamente la falta de alternativas.",
+        "narrative": {
+            "cambio":   "BCS pierde 35% de su capacidad diésel (único respaldo firme disponible). VoLL = 5 000 $/MWh para simular política de confiabilidad estricta.",
+            "observa":  "En el tab BCS: el precio marginal sube bruscamente. Posible aparición de **carga no servida** (barra roja en el despacho) si la demanda supera la capacidad reducida.",
+            "leccion":  "Los sistemas aislados son extremadamente vulnerables a la pérdida de capacidad firme. Sin interconexión, no hay respaldo externo — el VoLL es la única válvula de escape del LP, lo que refleja el costo económico real de un blackout.",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder":      {},
@@ -167,14 +188,19 @@ SCENARIOS: dict[str, dict] = {
             "forced_outage": {
                 "enabled":                True,
                 "system":                 "BCS",
-                "technology":             "diesel",   # alias → diesel_engine
+                "technology":             "diesel",
                 "capacity_loss_fraction": 0.35,
             },
         },
     },
     "🔋 Add Storage – Flexibility": {
-        "desc":   "Instala baterías en los tres sistemas: SIN 600 MW / 2 400 MWh, BCA 150 MW / 600 MWh, BCS 100 MW / 400 MWh. Eficiencia ida y vuelta 95%, SOC cíclico.",
+        "desc":   "Instala baterías en los tres sistemas: SIN 600 MW / 2 400 MWh, BCA 150 MW / 600 MWh, BCS 100 MW / 400 MWh. Eficiencia 95%, SOC cíclico.",
         "lesson": "La batería vale más cuando hay spreads de precios, picos de demanda o excedentes renovables. Reduce curtailment, suaviza picos de precio marginal y puede evitar shedding.",
+        "narrative": {
+            "cambio":   "Se añaden baterías BESS en cada sistema: SIN 600 MW/2 400 MWh (4 h), BCA 150/600, BCS 100/400. Eficiencia ida y vuelta 90.25% (0.95²). SOC cíclico.",
+            "observa":  "En el tab de cada sistema: aparece la sección **SOC de batería**. La batería carga en horas solares (precio bajo) y descarga al atardecer/noche (precio alto). El curtailment baja; el precio marginal se aplana.",
+            "leccion":  "El almacenamiento realiza **arbitraje temporal**: compra energía barata (solar) y la vende cara (pico). El spread de precio que la batería captura es exactamente su valor de mercado — si el spread baja a cero, la batería no tiene incentivo económico para operar.",
+        },
         "params": {
             "marginal_cost_multiplier":      {},
             "marginal_cost_adder":           {},
@@ -192,6 +218,11 @@ SCENARIOS: dict[str, dict] = {
     "🔴 VOLL Alto ($10 000)": {
         "desc":   "VoLL = $10 000/MWh — política de confiabilidad estricta. El modelo prefiere usar generación carísima antes que cortar carga.",
         "lesson": "Con VoLL alto, el shedding es el último recurso. Sube el uso de térmicas de respaldo y el costo total; la confiabilidad tiene un precio implícito muy alto.",
+        "narrative": {
+            "cambio":   "Solo cambia el VoLL: de 3 000 → 10 000 $/MWh. Todos los costos de generación permanecen iguales.",
+            "observa":  "El costo total sube porque el modelo despacha unidades más caras para evitar el shedding. El precio marginal puede alcanzar 10 000 $/MWh si hay escasez. El shedding es casi cero.",
+            "leccion":  "El VoLL es un **parámetro de política**, no técnico. Refleja cuánto está dispuesta a pagar la sociedad por evitar un blackout. Con VoLL alto, la curva de demanda es perfectamente inelástica — la electricidad se produce a cualquier costo.",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder":      {},
@@ -202,6 +233,11 @@ SCENARIOS: dict[str, dict] = {
     "🟡 VOLL Bajo ($2 000)": {
         "desc":   "VoLL = $2 000/MWh — política de confiabilidad laxa. El modelo puede sheddear antes si producir cuesta demasiado.",
         "lesson": "Con VoLL bajo, el shedding compite directamente con las térmicas caras. Aparece carga no servida cuando el costo marginal supera $2 000/MWh. La confiabilidad es una decisión política.",
+        "narrative": {
+            "cambio":   "VoLL baja de 3 000 → 2 000 $/MWh. Esto significa que el modelo prefiere cortar carga antes que despachar unidades con costo > 2 000 $/MWh.",
+            "observa":  "Si hay horas donde el único generador disponible cuesta más de 2 000 $/MWh, aparece **carga no servida** (barra oscura en la gráfica de despacho). Compara el shedding vs. el caso base.",
+            "leccion":  "El shedding no es un error del modelo — es una decisión de costo-beneficio. Cuando el costo de producir una unidad supera el VoLL, es \"más barato\" no servir la demanda. El VoLL implícito en el SEN real es mucho mayor (~20 000–50 000 $/MWh).",
+        },
         "params": {
             "marginal_cost_multiplier": {},
             "marginal_cost_adder":      {},
@@ -392,7 +428,42 @@ for i, sname in enumerate(SCENARIO_NAMES):
 active_scenario: str | None = st.session_state.get("active_scenario")
 if active_scenario and active_scenario in SCENARIOS:
     sc = SCENARIOS[active_scenario]
-    st.info(f"**{active_scenario}** — {sc['desc']}\n\n_Lección esperada:_ {sc['lesson']}")
+    nav = sc.get("narrative")
+    if nav:
+        st.markdown(
+            f"""
+<div style="border:1px solid rgba(49,51,63,0.12);border-radius:16px;
+            padding:16px 20px;background:rgba(255,255,255,0.70);margin-bottom:0.5rem;">
+  <div style="font-weight:700;font-size:1.02rem;margin-bottom:10px;">{active_scenario}</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="background:#DBEAFE;color:#1D4ED8;border-radius:6px;padding:2px 8px;
+                   font-size:0.78rem;font-weight:700;white-space:nowrap;margin-top:1px;">
+        ① QUÉ CAMBIÓ
+      </span>
+      <span style="font-size:0.93rem;color:rgba(49,51,63,0.85);">{nav['cambio']}</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="background:#D1FAE5;color:#065F46;border-radius:6px;padding:2px 8px;
+                   font-size:0.78rem;font-weight:700;white-space:nowrap;margin-top:1px;">
+        ② QUÉ OBSERVAR
+      </span>
+      <span style="font-size:0.93rem;color:rgba(49,51,63,0.85);">{nav['observa']}</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="background:#FEF3C7;color:#92400E;border-radius:6px;padding:2px 8px;
+                   font-size:0.78rem;font-weight:700;white-space:nowrap;margin-top:1px;">
+        ③ LECCIÓN
+      </span>
+      <span style="font-size:0.93rem;color:rgba(49,51,63,0.85);">{nav['leccion']}</span>
+    </div>
+  </div>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.info(f"**{active_scenario}** — {sc['desc']}\n\n_Lección esperada:_ {sc['lesson']}")
 
 st.divider()
 
@@ -1002,6 +1073,122 @@ def curtailment_chart(bus: str) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+# ── Helper: battery SOC chart ─────────────────────────────────────────────────
+def battery_soc_chart(bus: str) -> None:
+    bat_col = f"battery_{bus}"
+    if n.storage_units.empty or bat_col not in n.storage_units.index:
+        return  # no battery in this system — silently skip
+
+    soc = n.storage_units_t.state_of_charge.get(bat_col)
+    if soc is None or soc.empty:
+        st.caption("SOC no disponible para esta batería.")
+        return
+
+    e_max_mwh = float(n.storage_units.loc[bat_col, "p_nom"]) * float(
+        n.storage_units.loc[bat_col, "max_hours"]
+    )
+
+    # Charge / discharge power
+    p_net = n.storage_units_t.p.get(bat_col, pd.Series(0.0, index=soc.index))
+    try:
+        p_dispatch = n.storage_units_t.p_dispatch[bat_col].reindex(soc.index, fill_value=0.0)
+        p_store    = n.storage_units_t.p_store[bat_col].reindex(soc.index, fill_value=0.0)
+    except (KeyError, AttributeError):
+        # Fallback: derive from net power
+        p_dispatch = p_net.clip(lower=0)
+        p_store    = (-p_net).clip(lower=0)
+
+    soc_pct = soc / e_max_mwh * 100  # 0–100 %
+
+    # ── KPIs ──────────────────────────────────────────────────────────────────
+    energy_dispatched = p_dispatch.sum()           # MWh discharged total
+    equiv_cycles      = energy_dispatched / e_max_mwh if e_max_mwh > 0 else 0.0
+    soc_avg_pct       = soc_pct.mean()
+    soc_final_pct     = float(soc_pct.iloc[-1])
+
+    st.markdown("**🔋 Batería — Estado de Carga (SOC)**")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Capacidad", f"{e_max_mwh:,.0f} MWh",
+              help=f"Potencia: {n.storage_units.loc[bat_col, 'p_nom']:,.0f} MW")
+    m2.metric("Energía arbitrada", f"{energy_dispatched:,.0f} MWh")
+    m3.metric("Ciclos equivalentes", f"{equiv_cycles:.1f}",
+              help="Total descargado / capacidad nominal")
+    m4.metric("SOC promedio", f"{soc_avg_pct:.1f} %",
+              delta=f"Final: {soc_final_pct:.1f} %")
+
+    # ── Figure: 2 subplots ─────────────────────────────────────────────────────
+    fig = make_subplots(
+        rows=2, cols=1,
+        shared_xaxes=True,
+        row_heights=[0.65, 0.35],
+        vertical_spacing=0.06,
+        subplot_titles=("Estado de carga (MWh)", "Carga / Descarga (MW)"),
+    )
+
+    # ── Row 1: SOC area ────────────────────────────────────────────────────────
+    # Gradient-like effect: color by SOC level using a filled area
+    fig.add_trace(
+        go.Scatter(
+            x=soc.index, y=soc.values,
+            mode="lines",
+            name="SOC (MWh)",
+            line=dict(color="#06B6D4", width=2),
+            fill="tozeroy",
+            fillcolor="rgba(6,182,212,0.18)",
+            hovertemplate="%{x|%d-%b %H:%M}<br>SOC: %{y:,.0f} MWh<extra></extra>",
+        ),
+        row=1, col=1,
+    )
+    # 100 % reference line
+    fig.add_hline(
+        y=e_max_mwh, line_dash="dot", line_color="rgba(6,182,212,0.55)", row=1, col=1,
+        annotation_text=f"Máx {e_max_mwh:,.0f} MWh",
+        annotation_position="top right",
+        annotation_font_size=11,
+    )
+    # 50 % reference line
+    fig.add_hline(
+        y=e_max_mwh * 0.5, line_dash="dot", line_color="rgba(148,163,184,0.5)", row=1, col=1,
+        annotation_text="50 %",
+        annotation_position="bottom right",
+        annotation_font_size=10,
+    )
+
+    # ── Row 2: charge / discharge bars ────────────────────────────────────────
+    fig.add_trace(
+        go.Bar(
+            x=p_dispatch.index, y=p_dispatch.values,
+            name="Descarga (→ red)",
+            marker_color="rgba(6,182,212,0.80)",
+            hovertemplate="%{x|%d-%b %H:%M}<br>Descarga: %{y:,.1f} MW<extra></extra>",
+        ),
+        row=2, col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=p_store.index, y=(-p_store).values,
+            name="Carga (← red)",
+            marker_color="rgba(37,99,235,0.65)",
+            hovertemplate="%{x|%d-%b %H:%M}<br>Carga: %{customdata:,.1f} MW<extra></extra>",
+            customdata=p_store.values,
+        ),
+        row=2, col=1,
+    )
+
+    fig.update_layout(
+        height=480,
+        barmode="relative",
+        legend=dict(orientation="h", y=-0.12, font=dict(size=11)),
+        margin=dict(l=0, r=0, t=36, b=60),
+        hovermode="x unified",
+    )
+    fig.update_yaxes(title_text="MWh", row=1, col=1)
+    fig.update_yaxes(title_text="MW",  row=2, col=1, zeroline=True,
+                     zerolinecolor="rgba(100,100,100,0.3)")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
 # ── Tabs per system + global ──────────────────────────────────────────────────
 tabs = st.tabs([f"🗺 {s}" for s in SISTEMAS] + ["📊 Global"])
 
@@ -1029,6 +1216,8 @@ for idx, s in enumerate(SISTEMAS):
 
         st.markdown("**Curtailment de renovables**")
         curtailment_chart(s)
+
+        battery_soc_chart(s)
 
 # ── Global tab ────────────────────────────────────────────────────────────────
 with tabs[-1]:
@@ -1084,6 +1273,138 @@ with tabs[-1]:
             )
             st.plotly_chart(fig_sp, use_container_width=True)
 
+    # ── Reserve margin ────────────────────────────────────────────────────────
+    st.subheader("Margen de reserva por sistema")
+    _rm_cols = st.columns(len(SISTEMAS))
+    for _i, _s in enumerate(SISTEMAS):
+        _bus_gens_s = gen_info[
+            (gen_info["bus"] == _s) & (~gen_info.index.str.startswith("VoLL_"))
+        ].index.tolist()
+        _cap_mw = gen_info.loc[_bus_gens_s, "p_nom"].sum() if _bus_gens_s else 0.0
+        _load_s = n.loads_t.p_set[[c for c in n.loads_t.p_set.columns if c.startswith(_s)]]
+        _peak_mw = _load_s.sum(axis=1).max() if not _load_s.empty else 0.0
+        _rm = ((_cap_mw - _peak_mw) / _peak_mw * 100) if _peak_mw > 0 else float("nan")
+        _color = "normal" if _rm >= 20 else ("off" if _rm < 10 else "inverse")
+        _rm_cols[_i].metric(
+            label=f"Margen {_s}",
+            value=f"{_rm:.1f}%" if not pd.isna(_rm) else "N/D",
+            delta=f"Cap {_cap_mw:,.0f} MW | Pico {_peak_mw:,.0f} MW",
+            delta_color="off",
+        )
+    st.caption("Margen de reserva = (capacidad instalada − pico de demanda) / pico de demanda. Referencia mínima: 20%.")
+
+    # ── CO₂ emissions ─────────────────────────────────────────────────────────
+    CO2_FACTOR: dict[str, float] = {   # tCO₂/MWh (combustible → eléctrico)
+        "gas_ccgt":      0.37,
+        "gas_ocgt":      0.55,
+        "steam_other":   0.85,
+        "diesel_engine": 0.70,
+        "chp":           0.45,
+        "nuclear":       0.012,
+        "hydro":         0.024,
+        "solar":         0.0,
+        "onwind":        0.0,
+        "solar_thermal": 0.0,
+        "geothermal":    0.038,
+        "biogas":        0.0,
+        "biomass":       0.0,
+        "battery":       0.0,
+    }
+    st.subheader("Emisiones de CO₂ estimadas")
+    _non_voll = [g for g in dispatch.columns if not g.startswith("VoLL_")]
+    _gen_mwh_co2 = dispatch[_non_voll].sum()
+    _co2_by_gen = pd.Series({
+        g: _gen_mwh_co2[g] * CO2_FACTOR.get(gen_info.loc[g, "carrier"], 0.0)
+        for g in _non_voll if g in gen_info.index
+    })
+    _co2_by_carrier = _co2_by_gen.groupby(
+        gen_info.loc[_co2_by_gen.index, "carrier"]
+    ).sum().sort_values(ascending=False)
+    _total_co2 = _co2_by_carrier.sum()
+    _total_mwh = _gen_mwh_co2.sum()
+    _intensity  = _total_co2 / _total_mwh * 1000 if _total_mwh > 0 else 0  # gCO₂/kWh
+
+    _co2m1, _co2m2, _co2m3 = st.columns(3)
+    _co2m1.metric("Total CO₂", f"{_total_co2/1e6:.3f} MtCO₂")
+    _co2m2.metric("Intensidad carbónica", f"{_intensity:.0f} gCO₂/kWh")
+    _co2m3.metric("Sin emisiones (VRE+hidro)", f"{_co2_by_carrier.get('solar', 0) + _co2_by_carrier.get('onwind', 0):.0f} tCO₂")
+
+    _co2_df = pd.DataFrame({
+        "Tecnología": [CARRIER_LABELS.get(c, c) for c in _co2_by_carrier.index],
+        "tCO₂": _co2_by_carrier.values.round(1),
+        "Factor (tCO₂/MWh)": [CO2_FACTOR.get(c, 0.0) for c in _co2_by_carrier.index],
+    }).set_index("Tecnología")
+    _co2_df = _co2_df[_co2_df["tCO₂"] > 0.1]
+    if not _co2_df.empty:
+        st.dataframe(
+            _co2_df.style.format({"tCO₂": "{:,.1f}", "Factor (tCO₂/MWh)": "{:.3f}"}),
+            use_container_width=True, height=280,
+        )
+    st.caption("Factores de emisión orientativos (IPCC AR6 + CFE). No incluyen emisiones de ciclo de vida.")
+
+    # ── Price & Load Duration Curves ──────────────────────────────────────────
+    st.subheader("Curvas de duración de precio y carga")
+    _pdc_tabs = st.tabs([f"PDC / LDC — {s}" for s in SISTEMAS])
+    for _ti, _s in enumerate(SISTEMAS):
+        with _pdc_tabs[_ti]:
+            _sp_s = shadow_prices[_s] if (not shadow_prices.empty and _s in shadow_prices.columns) else pd.Series(dtype=float)
+            _load_col = [c for c in n.loads_t.p_set.columns if c.startswith(_s)]
+            _load_s   = n.loads_t.p_set[_load_col].sum(axis=1) if _load_col else pd.Series(dtype=float)
+
+            _fig_dur = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=["Price Duration Curve (PDC)", "Load Duration Curve (LDC)"],
+                horizontal_spacing=0.10,
+            )
+
+            if not _sp_s.empty:
+                _pdc_sorted = _sp_s.sort_values(ascending=False).values
+                _fig_dur.add_trace(
+                    go.Scatter(
+                        x=list(range(1, len(_pdc_sorted) + 1)),
+                        y=_pdc_sorted,
+                        mode="lines",
+                        name="Precio marginal",
+                        fill="tozeroy",
+                        line=dict(color=SYSTEM_COLORS.get(_s, "#888"), width=1.5),
+                        hovertemplate="Hora %{x}: %{y:.0f} $/MWh<extra></extra>",
+                    ),
+                    row=1, col=1,
+                )
+                _fig_dur.update_xaxes(title_text="Horas (ordenadas)", row=1, col=1)
+                _fig_dur.update_yaxes(title_text="$/MWh", row=1, col=1)
+
+            if not _load_s.empty:
+                _ldc_sorted = _load_s.sort_values(ascending=False).values
+                _fig_dur.add_trace(
+                    go.Scatter(
+                        x=list(range(1, len(_ldc_sorted) + 1)),
+                        y=_ldc_sorted,
+                        mode="lines",
+                        name="Demanda MW",
+                        fill="tozeroy",
+                        line=dict(color="#64748B", width=1.5),
+                        hovertemplate="Hora %{x}: %{y:,.0f} MW<extra></extra>",
+                    ),
+                    row=1, col=2,
+                )
+                _fig_dur.update_xaxes(title_text="Horas (ordenadas)", row=1, col=2)
+                _fig_dur.update_yaxes(title_text="MW", row=1, col=2)
+
+            _fig_dur.update_layout(
+                height=360,
+                margin=dict(l=0, r=0, t=40, b=0),
+                showlegend=False,
+            )
+            st.plotly_chart(_fig_dur, use_container_width=True)
+            if not _sp_s.empty:
+                _pct_zero = (_sp_s == 0).mean() * 100
+                _pct_voll = (_sp_s >= VOLL_DEFAULT * 0.99).mean() * 100
+                st.caption(
+                    f"Horas con precio = 0 $/MWh (exceso renovable): **{_pct_zero:.1f}%**  |  "
+                    f"Horas con precio ≥ VoLL (escasez): **{_pct_voll:.1f}%**"
+                )
+
     # Cost breakdown table
     st.subheader("Desglose de generación y costo por central")
     gen_mwh_all = dispatch.drop(columns=voll_gens, errors="ignore").sum()
@@ -1112,7 +1433,7 @@ with tabs[-1]:
     out_dir = ROOT / "outputs"
     out_dir.mkdir(exist_ok=True)
 
-    dl1, dl2, dl3 = st.columns(3)
+    dl1, dl2, dl3, dl4 = st.columns(4)
     dl1.download_button(
         "📥 Despacho por central (CSV)",
         data=dispatch.to_csv().encode("utf-8"),
@@ -1128,4 +1449,10 @@ with tabs[-1]:
         data=used_df.to_csv().encode("utf-8"),
         file_name="generacion_centrales.csv", mime="text/csv",
     )
+    if not n.storage_units_t.state_of_charge.empty:
+        dl4.download_button(
+            "📥 SOC baterías (CSV)",
+            data=n.storage_units_t.state_of_charge.to_csv().encode("utf-8"),
+            file_name="battery_soc.csv", mime="text/csv",
+        )
 
