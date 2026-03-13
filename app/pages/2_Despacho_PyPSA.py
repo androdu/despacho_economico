@@ -413,6 +413,10 @@ for s in SISTEMAS:
     if s not in dem_z_full.columns:
         dem_z_full[s] = 0.0
 dem_z_full = dem_z_full[SISTEMAS]
+# ── Validar integridad de demanda ─────────────────────────────────────────────
+for s in SISTEMAS:
+    if dem_z_full[s].sum() == 0:
+        st.warning(f"⚠️ Advertencia: La demanda del sistema **{s}** es totalmente 0 MW en los datos cargados. Revisa la descarga de datos.")
 
 _avail_min = dem_z_full.index.min().date()
 _avail_max = dem_z_full.index.max().date()
@@ -685,10 +689,16 @@ def build_and_solve(
     profile_year = p_max_pu_raw.index.year[0]
     demand_year  = snapshots.year[0]
     if profile_year != demand_year:
+        def safe_replace_year(ts, new_year):
+            try:
+                return ts.replace(year=new_year)
+            except ValueError:
+                # Manejo de años bisiestos (29 feb -> 28 feb en año no bisiesto)
+                return ts.replace(year=new_year, day=28)
+
         p_max_pu_aligned = p_max_pu_raw.copy()
-        p_max_pu_aligned.index = p_max_pu_raw.index.map(
-            lambda ts: ts.replace(year=demand_year)
-        )
+        # Usar map con función segura para evitar crash en 29 de febrero
+        p_max_pu_aligned.index = p_max_pu_raw.index.map(lambda ts: safe_replace_year(ts, demand_year))
     else:
         p_max_pu_aligned = p_max_pu_raw
 
@@ -781,6 +791,16 @@ def build_and_solve(
     if profile_gens:
         gen_carrier_map = n.generators.loc[profile_gens, "carrier"]
         p_raw = p_max_pu_aligned[profile_gens].reindex(index=snapshots)
+        
+        # ── Validación de alineación de índices ──
+        # Si reindex falló por timezone mismatch o desalineación, todo será NaN.
+        # Verificamos si hay columnas que quedaron totalmente vacías siendo que existían antes.
+        if p_raw.isna().all().all() and not p_max_pu_aligned.empty:
+            raise ValueError(
+                "Error de alineación de tiempo: Los índices de fecha del perfil de generadores y la demanda no coinciden. "
+                "Verifica si uno tiene Timezone y el otro no."
+            )
+
         vre_cols  = [g for g in profile_gens if gen_carrier_map[g] in VRE_CARRIERS]
         firm_cols = [g for g in profile_gens if gen_carrier_map[g] not in VRE_CARRIERS]
         if vre_cols:
@@ -1110,7 +1130,12 @@ def shadow_price_chart(bus: str) -> None:
         margin=dict(l=0, r=0, t=36, b=0),
     )
     st.plotly_chart(fig, use_container_width=True)
-    st.caption(f"Máximo: **{mx:,.1f} $/MWh** — Promedio: **{avg:,.1f} $/MWh**")
+    st.caption(
+        f"Máximo: **{mx:,.1f} $/MWh** — Promedio: **{avg:,.1f} $/MWh**  \n"
+        "ℹ️ El PML real incluye componentes de **congestión** y **pérdidas** que este modelo no calcula "
+        "(red copper-plate, sin transmisión entre zonas). El precio aquí refleja únicamente el costo "
+        "variable del generador marginal."
+    )
 
 
 # ── Helper: curtailment chart ─────────────────────────────────────────────────
@@ -1606,4 +1631,3 @@ with tabs[-1]:
             data=n.storage_units_t.state_of_charge.to_csv().encode("utf-8"),
             file_name="battery_soc.csv", mime="text/csv",
         )
-
