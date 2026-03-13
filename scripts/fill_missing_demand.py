@@ -64,6 +64,8 @@ def load_balance_history() -> pd.DataFrame:
             df = df.dropna(subset=["hora", "demand_mw"])
             df["snapshot"] = op_date + pd.to_timedelta(df["hora"].astype(int) - 1, unit="h")
             df["zona"] = df["zona"].replace({"BSA": "BCA"})
+            # SIN is split into 7 areas — sum to get system total
+            df = df.groupby(["snapshot", "zona"], as_index=False)["demand_mw"].sum()
             frames.append(df[["snapshot", "zona", "demand_mw"]])
         except Exception as e:
             print(f"  Saltando {f.name}: {e}", file=sys.stderr)

@@ -341,6 +341,8 @@ def load_demand_raw() -> pd.DataFrame:
         )
         df = df.dropna(subset=["hora", "demand_mw"])
         df["snapshot"] = op_date + pd.to_timedelta(df["hora"].astype(int) - 1, unit="h")
+        # SIN is split into 7 areas in the CSV — sum areas to get system total
+        df = df.groupby(["snapshot", "zona"], as_index=False)["demand_mw"].sum()
         all_dfs.append(df[["snapshot", "zona", "demand_mw"]])
 
     # ── 2. CSVs de la API diaria (fetch_daily_demand.py / GitHub Action) ──────
