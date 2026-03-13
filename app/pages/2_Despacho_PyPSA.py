@@ -128,7 +128,7 @@ SCENARIOS: dict[str, dict] = {
             "capacity_delta_mw":        {},
             "forced_outage":            {"enabled": False},
             "vre_profile_multiplier":   {},
-            "battery_enable":           True,
+            "battery_enable":           False,
         },
     },
     "⛽ Fuel Price Shock": {
@@ -287,6 +287,13 @@ CO2_FACTOR: dict[str, float] = {
     "biogas":        0.0,
     "biomass":       0.0,
     "battery":       0.0,
+}
+
+# p_min_pu for inflexible technologies (cannot ramp down freely)
+INFLEXIBLE_PMIN: dict[str, float] = {
+    "nuclear":    0.85,
+    "geothermal": 0.80,
+    "chp":        0.40,
 }
 
 # Carrier alias map: scenario-facing names → internal carrier keys
@@ -710,6 +717,7 @@ def build_and_solve(
     for _, row in centrales.iterrows():
         carrier = str(row["carrier"])
         mc      = costs.get(carrier, float(row["marginal_cost"]))
+        pmin    = INFLEXIBLE_PMIN.get(carrier, 0.0)
         n.add(
             "Generator",
             name=str(row["name"]),
@@ -718,6 +726,7 @@ def build_and_solve(
             p_nom=float(row["p_nom"]),
             marginal_cost=float(mc),
             efficiency=float(row.get("efficiency", 1.0)),
+            p_min_pu=float(pmin),
         )
 
     # 2026 expected growth generators
@@ -808,6 +817,14 @@ def build_and_solve(
         if firm_cols:
             p_raw[firm_cols] = p_raw[firm_cols].fillna(1.0)
         n.generators_t.p_max_pu = p_raw.clip(0.0, 1.0)
+
+        # Cap hidro at 0.55 — simple availability factor (no perfil diario real)
+        hydro_gens = n.generators.index[n.generators["carrier"] == "hydro"]
+        hydro_in_profile = [g for g in hydro_gens if g in n.generators_t.p_max_pu.columns]
+        if hydro_in_profile:
+            n.generators_t.p_max_pu.loc[:, hydro_in_profile] = (
+                n.generators_t.p_max_pu.loc[:, hydro_in_profile].clip(upper=0.55)
+            )
 
     # Loads
     for s in SISTEMAS:
@@ -1053,18 +1070,21 @@ def dispatch_chart(bus: str, title: str) -> None:
     else:
         disp_carrier = pd.DataFrame(index=n.snapshots)
 
-    # Add battery net dispatch (positive = discharge, negative = charge)
+    # Battery net dispatch handled separately (positive=discharge, negative=charge)
     bat_col = f"battery_{bus}"
+    _bat_series = None
     if not n.storage_units.empty and bat_col in n.storage_units.index:
         if bat_col in n.storage_units_t.p.columns:
-            disp_carrier["battery"] = n.storage_units_t.p[bat_col]
+            _bat_series = n.storage_units_t.p[bat_col]
 
     # Append shedding if any
     voll_col = f"VoLL_{bus}"
     if voll_col in dispatch.columns and dispatch[voll_col].sum() > 0.1:
         disp_carrier["shedding"] = dispatch[voll_col]
 
-    carrier_order = [c for c in CARRIERS + ["shedding"] if c in disp_carrier.columns]
+    # Exclude battery from stack carriers (handled as separate line below)
+    stack_carriers = [c for c in CARRIERS if c != "battery"] + ["shedding"]
+    carrier_order = [c for c in stack_carriers if c in disp_carrier.columns]
     disp_carrier = disp_carrier.reindex(columns=carrier_order, fill_value=0.0)
 
     fig = go.Figure()
@@ -1082,6 +1102,17 @@ def dispatch_chart(bus: str, title: str) -> None:
             line=dict(width=0.5, color=color),
             fillcolor=color,
             hovertemplate=f"{label}<br>%{{x|%d-%b %H:%M}}<br>%{{y:,.0f}} MW<extra></extra>",
+        ))
+
+    # Battery as separate dashed line (avoids negative values breaking stacked area)
+    if _bat_series is not None and _bat_series.abs().sum() > 0.1:
+        fig.add_trace(go.Scatter(
+            x=_bat_series.index,
+            y=_bat_series.values,
+            mode="lines",
+            name=CARRIER_LABELS["battery"],
+            line=dict(color=CARRIER_COLORS["battery"], width=2, dash="dash"),
+            hovertemplate=f"Batería neta<br>%{{x|%d-%b %H:%M}}<br>%{{y:,.0f}} MW<extra></extra>",
         ))
 
     # Demand overlay
@@ -1389,9 +1420,10 @@ with tabs[-1]:
                 _sfo = _sp.get("forced_outage", {})
                 _sfo = _sfo if _sfo.get("enabled", False) else None
                 _sbat = _sp if _sp.get("battery_enable", False) else None
+                _s_voll = float(_sp.get("voll_value", voll_input))
                 _sn = build_and_solve(
                     centrales_base.copy(), p_max_pu_raw, dem_z,
-                    _sc, growth_2026, float(voll_input),
+                    _sc, growth_2026, _s_voll,
                     demand_mult=_sdm, capacity_mult=_scm,
                     forced_outage=_sfo, battery_config=_sbat,
                 )
@@ -1473,7 +1505,8 @@ with tabs[-1]:
             (gen_info["bus"] == _s) & (~gen_info.index.str.startswith("VoLL_"))
         ].index.tolist()
         _cap_mw = gen_info.loc[_bus_gens_s, "p_nom"].sum() if _bus_gens_s else 0.0
-        _load_s = n.loads_t.p_set[[c for c in n.loads_t.p_set.columns if c.startswith(_s)]]
+        _load_col_rm = f"load_{_s}"
+        _load_s = n.loads_t.p_set[[_load_col_rm]] if _load_col_rm in n.loads_t.p_set.columns else pd.DataFrame()
         _peak_mw = _load_s.sum(axis=1).max() if not _load_s.empty else 0.0
         _rm = ((_cap_mw - _peak_mw) / _peak_mw * 100) if _peak_mw > 0 else float("nan")
         _color = "normal" if _rm >= 20 else ("off" if _rm < 10 else "inverse")
@@ -1524,8 +1557,12 @@ with tabs[-1]:
     for _ti, _s in enumerate(SISTEMAS):
         with _pdc_tabs[_ti]:
             _sp_s = shadow_prices[_s] if (not shadow_prices.empty and _s in shadow_prices.columns) else pd.Series(dtype=float)
-            _load_col = [c for c in n.loads_t.p_set.columns if c.startswith(_s)]
-            _load_s   = n.loads_t.p_set[_load_col].sum(axis=1) if _load_col else pd.Series(dtype=float)
+            _load_col_ldc = f"load_{_s}"
+            _load_s = (
+                n.loads_t.p_set[[_load_col_ldc]].sum(axis=1)
+                if _load_col_ldc in n.loads_t.p_set.columns
+                else pd.Series(dtype=float)
+            )
 
             _fig_dur = make_subplots(
                 rows=1, cols=2,
@@ -1603,6 +1640,53 @@ with tabs[-1]:
         use_container_width=True,
         height=420,
     )
+
+    # ── Diagnóstico: generadores sin perfil ──────────────────────────────────
+    with st.expander("🔍 Diagnóstico: generadores sin perfil horario", expanded=False):
+        _all_gens = [g for g in n.generators.index if not g.startswith("VoLL_")]
+        _profile_cols = n.generators_t.p_max_pu.columns.tolist() if not n.generators_t.p_max_pu.empty else []
+        _missing_prof = [g for g in _all_gens if g not in _profile_cols]
+        st.write(f"Generadores sin perfil (usan p_max_pu=1 constante): **{len(_missing_prof)}** de {len(_all_gens)}")
+        if _missing_prof:
+            st.dataframe(
+                gen_info.loc[[g for g in _missing_prof if g in gen_info.index], ["bus", "carrier", "p_nom"]].head(40),
+                use_container_width=True,
+            )
+
+    # ── Generador marginal por hora y sistema ────────────────────────────────
+    with st.expander("📌 Generador marginal (quién fija el precio)", expanded=False):
+        st.caption(
+            "Para cada hora y sistema, el generador con mayor costo variable entre los despachados. "
+            "Permite validar si el precio sombra es consistente con el merit order."
+        )
+        for _ps in SISTEMAS:
+            _bus_gens_ps = n.generators.index[
+                (n.generators["bus"] == _ps) & (~n.generators.index.str.startswith("VoLL_"))
+            ]
+            _disp_ps = n.generators_t.p[_bus_gens_ps]
+            _mc_ps   = n.generators.loc[_bus_gens_ps, "marginal_cost"]
+            _rows_ps = []
+            for _t in n.snapshots:
+                _active = _disp_ps.loc[_t][_disp_ps.loc[_t] > 1e-3].index
+                if len(_active) > 0:
+                    _mg = _mc_ps.loc[_active].idxmax()
+                    _rows_ps.append({
+                        "snapshot":           _t,
+                        "marginal_generator": _mg,
+                        "carrier":            n.generators.loc[_mg, "carrier"],
+                        "CV ($/MWh)":         n.generators.loc[_mg, "marginal_cost"],
+                        "shadow_price":       n.buses_t.marginal_price.loc[_t, _ps] if _ps in n.buses_t.marginal_price.columns else None,
+                    })
+            if _rows_ps:
+                _ps_df = pd.DataFrame(_rows_ps).set_index("snapshot")
+                _most_common = _ps_df["carrier"].value_counts().head(5)
+                st.markdown(f"**{_ps}** — carriers más frecuentes como marginal:")
+                st.dataframe(_most_common.rename("horas"), use_container_width=False)
+                with st.expander(f"Ver tabla completa {_ps}", expanded=False):
+                    st.dataframe(
+                        _ps_df.style.format({"CV ($/MWh)": "{:.0f}", "shadow_price": "{:.1f}"}),
+                        use_container_width=True, height=300,
+                    )
 
     # Downloads
     st.subheader("Descargas")
