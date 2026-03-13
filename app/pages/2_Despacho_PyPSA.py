@@ -296,6 +296,36 @@ INFLEXIBLE_PMIN: dict[str, float] = {
     "chp":        0.40,
 }
 
+# Dispatch category — determines p_max_pu default when no profile is available
+#   vre        → profile mandatory; 0.0 if missing (no sun/wind = no generation)
+#   hydro      → availability factor P_MAX_AVAIL["hydro"] (partial reservoir constraint)
+#   inflexible → rated availability factor P_MAX_AVAIL[carrier] (forced baseload)
+#   thermal    → 1.0 (fully dispatchable on demand)
+DISPATCH_CATEGORY: dict[str, str] = {
+    "solar":         "vre",
+    "onwind":        "vre",
+    "hydro":         "hydro",
+    "nuclear":       "inflexible",
+    "geothermal":    "inflexible",
+    "chp":           "inflexible",
+    "gas_ccgt":      "thermal",
+    "gas_ocgt":      "thermal",
+    "diesel_engine": "thermal",
+    "steam_other":   "thermal",
+    "solar_thermal": "thermal",
+    "biogas":        "thermal",
+    "biomass":       "thermal",
+    "battery":       "thermal",
+}
+
+# Default p_max_pu for categories / carriers without a real-time profile
+P_MAX_AVAIL: dict[str, float] = {
+    "hydro":      0.55,   # seasonal reservoir + run-of-river constraint
+    "nuclear":    0.90,   # planned outage factor
+    "geothermal": 0.90,   # high capacity factor but not 100%
+    "chp":        0.85,   # heat-demand coupling limits full output
+}
+
 # Carrier alias map: scenario-facing names → internal carrier keys
 CARRIER_ALIAS: dict[str, str] = {
     "wind":   "onwind",
@@ -793,37 +823,57 @@ def build_and_solve(
                     cyclic_state_of_charge=cyclic_soc,
                 )
 
-    # Time-varying p_max_pu profiles (only for generators present in Perfil CSV)
-    # Fill strategy: VRE (solar/wind) → 0.0 (no sun/wind = no generation)
-    #                dispatchable (hydro, gas, etc.) → 1.0 (assume full availability when data missing)
-    profile_gens = [g for g in n.generators.index if g in p_max_pu_aligned.columns]
+    # ── p_max_pu: 4-category dispatch logic ──────────────────────────────────
+    # Category    | Source             | Missing-data default
+    # ------------|--------------------|-----------------------------------------
+    # vre         | Perfil CSV (real)  | 0.0  (no resource = no generation)
+    # hydro       | Perfil CSV + cap   | P_MAX_AVAIL["hydro"] (reservoir factor)
+    # inflexible  | Perfil CSV + cap   | P_MAX_AVAIL[carrier] (rated availability)
+    # thermal     | Perfil CSV or 1.0  | 1.0  (fully dispatchable)
+    all_gens        = n.generators.index.tolist()
+    carrier_map_all = n.generators["carrier"]
+    profile_gens    = [g for g in all_gens if g in p_max_pu_aligned.columns]
+
     if profile_gens:
-        gen_carrier_map = n.generators.loc[profile_gens, "carrier"]
         p_raw = p_max_pu_aligned[profile_gens].reindex(index=snapshots)
-        
-        # ── Validación de alineación de índices ──
-        # Si reindex falló por timezone mismatch o desalineación, todo será NaN.
-        # Verificamos si hay columnas que quedaron totalmente vacías siendo que existían antes.
         if p_raw.isna().all().all() and not p_max_pu_aligned.empty:
             raise ValueError(
                 "Error de alineación de tiempo: Los índices de fecha del perfil de generadores y la demanda no coinciden. "
                 "Verifica si uno tiene Timezone y el otro no."
             )
+        # Per-column fill based on dispatch category
+        for g in profile_gens:
+            if p_raw[g].isna().any():
+                cat = DISPATCH_CATEGORY.get(carrier_map_all[g], "thermal")
+                if cat == "vre":
+                    p_raw[g] = p_raw[g].fillna(0.0)
+                elif cat in ("hydro", "inflexible"):
+                    p_raw[g] = p_raw[g].fillna(P_MAX_AVAIL.get(carrier_map_all[g], 1.0))
+                else:  # thermal
+                    p_raw[g] = p_raw[g].fillna(1.0)
+        p_raw = p_raw.clip(0.0, 1.0)
+    else:
+        p_raw = pd.DataFrame(index=snapshots)
 
-        vre_cols  = [g for g in profile_gens if gen_carrier_map[g] in VRE_CARRIERS]
-        firm_cols = [g for g in profile_gens if gen_carrier_map[g] not in VRE_CARRIERS]
-        if vre_cols:
-            p_raw[vre_cols]  = p_raw[vre_cols].fillna(0.0)
-        if firm_cols:
-            p_raw[firm_cols] = p_raw[firm_cols].fillna(1.0)
-        n.generators_t.p_max_pu = p_raw.clip(0.0, 1.0)
+    # Expand to ALL generators — those absent from Perfil CSV get category defaults
+    p_max_pu_full = p_raw.reindex(columns=all_gens)
+    for g in all_gens:
+        if p_max_pu_full[g].isna().all():
+            cat = DISPATCH_CATEGORY.get(carrier_map_all[g], "thermal")
+            if cat == "vre":
+                p_max_pu_full[g] = 0.0
+            elif cat in ("hydro", "inflexible"):
+                p_max_pu_full[g] = P_MAX_AVAIL.get(carrier_map_all[g], 1.0)
+            else:
+                p_max_pu_full[g] = 1.0
+    n.generators_t.p_max_pu = p_max_pu_full.clip(0.0, 1.0)
 
-        # Cap hidro at 0.55 — simple availability factor (no perfil diario real)
-        hydro_gens = n.generators.index[n.generators["carrier"] == "hydro"]
-        hydro_in_profile = [g for g in hydro_gens if g in n.generators_t.p_max_pu.columns]
-        if hydro_in_profile:
-            n.generators_t.p_max_pu.loc[:, hydro_in_profile] = (
-                n.generators_t.p_max_pu.loc[:, hydro_in_profile].clip(upper=0.55)
+    # Enforce availability caps for hydro and inflexibles (even if profile exists)
+    for carrier, cap in P_MAX_AVAIL.items():
+        capped_gens = n.generators.index[n.generators["carrier"] == carrier]
+        if not capped_gens.empty:
+            n.generators_t.p_max_pu.loc[:, capped_gens] = (
+                n.generators_t.p_max_pu.loc[:, capped_gens].clip(upper=cap)
             )
 
     # Loads
@@ -1055,6 +1105,100 @@ if _show_comparison:
                 )
 
 st.divider()
+
+# ── Helper: identifica unidad marginal plausible por hora y bus ───────────────
+def identify_marginal_generator(
+    n: pypsa.Network,
+    bus: str,
+    tol_mw: float = 1.0,
+    tol_price: float = 1.0,
+) -> pd.DataFrame:
+    """
+    Identifica una unidad marginal plausible por hora en un bus.
+    Criterio:
+    1) unidad despachada
+    2) no pegada al mínimo ni al máximo
+    3) costo variable ~ precio sombra
+    Fallback: unidad despachada más cara.
+    """
+    gens = n.generators.index[
+        (n.generators["bus"] == bus) & (~n.generators.index.str.startswith("VoLL_"))
+    ].tolist()
+
+    if not gens or bus not in n.buses_t.marginal_price.columns:
+        return pd.DataFrame()
+
+    dispatch = n.generators_t.p[gens].copy()
+    mc = n.generators.loc[gens, "marginal_cost"].copy()
+    p_nom = n.generators.loc[gens, "p_nom"].copy()
+    p_min_pu = n.generators.loc[gens, "p_min_pu"].fillna(0.0).copy()
+
+    if n.generators_t.p_max_pu.empty:
+        p_max_pu = pd.DataFrame(1.0, index=n.snapshots, columns=gens)
+    else:
+        p_max_pu = n.generators_t.p_max_pu.reindex(index=n.snapshots, columns=gens, fill_value=1.0)
+
+    rows = []
+
+    for t in n.snapshots:
+        sp = float(n.buses_t.marginal_price.loc[t, bus])
+
+        p_t = dispatch.loc[t]
+        pmax_t = p_nom * p_max_pu.loc[t]
+        pmin_t = p_nom * p_min_pu
+
+        active = p_t[p_t > tol_mw].index.tolist()
+
+        if not active:
+            rows.append({
+                "snapshot": t,
+                "shadow_price": sp,
+                "marginal_generator": None,
+                "carrier": None,
+                "CV ($/MWh)": None,
+                "status": "sin generación",
+            })
+            continue
+
+        interior = []
+        for g in active:
+            at_min = p_t[g] <= (pmin_t[g] + tol_mw)
+            at_max = p_t[g] >= (pmax_t[g] - tol_mw)
+            if (not at_min) and (not at_max):
+                interior.append(g)
+
+        # 1) Interior con costo cercano al precio
+        close_to_price = [g for g in interior if abs(float(mc[g]) - sp) <= tol_price]
+        if close_to_price:
+            chosen = max(close_to_price, key=lambda g: mc[g])
+            status = "interior ~ precio"
+        # 2) Interior aunque no empate exacto
+        elif interior:
+            chosen = min(interior, key=lambda g: abs(float(mc[g]) - sp))
+            status = "interior cercano"
+        # 3) Fallback: despachado más caro
+        else:
+            chosen = max(active, key=lambda g: mc[g])
+            status = "fallback más caro despachado"
+
+        chosen_at_min = p_t[chosen] <= (pmin_t[chosen] + tol_mw)
+        chosen_at_max = p_t[chosen] >= (pmax_t[chosen] - tol_mw)
+        rows.append({
+            "snapshot": t,
+            "shadow_price": sp,
+            "marginal_generator": chosen,
+            "carrier": n.generators.loc[chosen, "carrier"],
+            "CV ($/MWh)": float(mc[chosen]),
+            "dispatch_MW": float(p_t[chosen]),
+            "pmin_MW": float(pmin_t[chosen]),
+            "pmax_MW": float(pmax_t[chosen]),
+            "at_min": bool(chosen_at_min),
+            "at_max": bool(chosen_at_max),
+            "status": status,
+        })
+
+    return pd.DataFrame(rows).set_index("snapshot")
+
 
 # ── Helper: dispatch stacked-area chart ───────────────────────────────────────
 def dispatch_chart(bus: str, title: str) -> None:
@@ -1612,7 +1756,12 @@ with tabs[-1]:
             st.plotly_chart(_fig_dur, use_container_width=True)
             if not _sp_s.empty:
                 _pct_zero = (_sp_s == 0).mean() * 100
-                _pct_voll = (_sp_s >= VOLL_DEFAULT * 0.99).mean() * 100
+                _voll_solved = n.generators.loc[
+                    n.generators.index.str.startswith("VoLL_"), "marginal_cost"
+                ].max()
+                if pd.isna(_voll_solved):
+                    _voll_solved = float(voll_input)
+                _pct_voll = (_sp_s >= _voll_solved * 0.99).mean() * 100
                 st.caption(
                     f"Horas con precio = 0 $/MWh (exceso renovable): **{_pct_zero:.1f}%**  |  "
                     f"Horas con precio ≥ VoLL (escasez): **{_pct_voll:.1f}%**"
@@ -1644,9 +1793,13 @@ with tabs[-1]:
     # ── Diagnóstico: generadores sin perfil ──────────────────────────────────
     with st.expander("🔍 Diagnóstico: generadores sin perfil horario", expanded=False):
         _all_gens = [g for g in n.generators.index if not g.startswith("VoLL_")]
-        _profile_cols = n.generators_t.p_max_pu.columns.tolist() if not n.generators_t.p_max_pu.empty else []
-        _missing_prof = [g for g in _all_gens if g not in _profile_cols]
-        st.write(f"Generadores sin perfil (usan p_max_pu=1 constante): **{len(_missing_prof)}** de {len(_all_gens)}")
+        _explicit_profile_cols = p_max_pu_raw.columns.tolist()
+        _missing_prof = [g for g in _all_gens if g not in _explicit_profile_cols]
+        st.write(f"Generadores sin perfil explícito en el CSV: **{len(_missing_prof)}** de {len(_all_gens)}")
+        st.caption(
+            "Estos generadores usan disponibilidad por defecto según su categoría operativa "
+            "(VRE=0, hidro/parcial, inflexibles<1, térmicas=1)."
+        )
         if _missing_prof:
             st.dataframe(
                 gen_info.loc[[g for g in _missing_prof if g in gen_info.index], ["bus", "carrier", "p_nom"]].head(40),
@@ -1654,38 +1807,29 @@ with tabs[-1]:
             )
 
     # ── Generador marginal por hora y sistema ────────────────────────────────
-    with st.expander("📌 Generador marginal (quién fija el precio)", expanded=False):
+    with st.expander("📌 Candidato a unidad marginal", expanded=False):
         st.caption(
-            "Para cada hora y sistema, el generador con mayor costo variable entre los despachados. "
-            "Permite validar si el precio sombra es consistente con el merit order."
+            "El precio marginal en un LP puede surgir de varias restricciones activas simultáneamente. "
+            "Por ello, esta tabla identifica una unidad marginal plausible, "
+            "no necesariamente una unidad marginal única exacta."
         )
         for _ps in SISTEMAS:
-            _bus_gens_ps = n.generators.index[
-                (n.generators["bus"] == _ps) & (~n.generators.index.str.startswith("VoLL_"))
-            ]
-            _disp_ps = n.generators_t.p[_bus_gens_ps]
-            _mc_ps   = n.generators.loc[_bus_gens_ps, "marginal_cost"]
-            _rows_ps = []
-            for _t in n.snapshots:
-                _active = _disp_ps.loc[_t][_disp_ps.loc[_t] > 1e-3].index
-                if len(_active) > 0:
-                    _mg = _mc_ps.loc[_active].idxmax()
-                    _rows_ps.append({
-                        "snapshot":           _t,
-                        "marginal_generator": _mg,
-                        "carrier":            n.generators.loc[_mg, "carrier"],
-                        "CV ($/MWh)":         n.generators.loc[_mg, "marginal_cost"],
-                        "shadow_price":       n.buses_t.marginal_price.loc[_t, _ps] if _ps in n.buses_t.marginal_price.columns else None,
-                    })
-            if _rows_ps:
-                _ps_df = pd.DataFrame(_rows_ps).set_index("snapshot")
-                _most_common = _ps_df["carrier"].value_counts().head(5)
-                st.markdown(f"**{_ps}** — carriers más frecuentes como marginal:")
+            _ps_df = identify_marginal_generator(n, _ps, tol_mw=1.0, tol_price=2.0)
+            if not _ps_df.empty:
+                st.markdown(f"**{_ps}** — carriers más frecuentes como marginal plausible:")
+                _most_common = _ps_df["carrier"].fillna("N/D").value_counts().head(5)
                 st.dataframe(_most_common.rename("horas"), use_container_width=False)
                 with st.expander(f"Ver tabla completa {_ps}", expanded=False):
                     st.dataframe(
-                        _ps_df.style.format({"CV ($/MWh)": "{:.0f}", "shadow_price": "{:.1f}"}),
-                        use_container_width=True, height=300,
+                        _ps_df.style.format({
+                            "shadow_price": "{:.1f}",
+                            "CV ($/MWh)": "{:.1f}",
+                            "dispatch_MW": "{:.1f}",
+                            "pmin_MW": "{:.1f}",
+                            "pmax_MW": "{:.1f}",
+                        }),
+                        use_container_width=True,
+                        height=320,
                     )
 
     # Downloads
