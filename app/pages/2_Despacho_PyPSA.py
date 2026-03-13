@@ -271,6 +271,24 @@ GROWTH_TOTAL_MW = sum(r[3] for r in GROWTH_2026)
 VRE_CARRIERS = {"solar", "onwind"}  # Variable renewable energy: curtailment-eligible only
 SYSTEM_COLORS = {"SIN": "#2563EB", "BCA": "#16A34A", "BCS": "#EA580C"}
 
+# CO₂ emission factors (tCO₂/MWh electrical output, IPCC AR6 median)
+CO2_FACTOR: dict[str, float] = {
+    "gas_ccgt":      0.37,
+    "gas_ocgt":      0.55,
+    "steam_other":   0.85,
+    "diesel_engine": 0.70,
+    "chp":           0.45,
+    "nuclear":       0.012,
+    "hydro":         0.024,
+    "solar":         0.0,
+    "onwind":        0.0,
+    "solar_thermal": 0.0,
+    "geothermal":    0.038,
+    "biogas":        0.0,
+    "biomass":       0.0,
+    "battery":       0.0,
+}
+
 # Carrier alias map: scenario-facing names → internal carrier keys
 CARRIER_ALIAS: dict[str, str] = {
     "wind":   "onwind",
@@ -589,6 +607,58 @@ with st.expander("③ 🎚️ Costos variables por tecnología ($/MWh)", expande
 
 run_btn = st.button("▶ Correr despacho", type="primary")
 st.divider()
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Metrics extractor (reused for comparison table)
+# ──────────────────────────────────────────────────────────────────────────────
+def extract_metrics(n: pypsa.Network) -> dict:
+    """Return a flat dict of summary metrics for one solved network."""
+    gi = n.generators[["bus", "carrier", "p_nom", "marginal_cost"]].copy()
+    disp = n.generators_t.p.copy()
+    voll_g = [g for g in disp.columns if g.startswith("VoLL_")]
+    non_voll = [g for g in disp.columns if not g.startswith("VoLL_")]
+
+    gen_mwh = disp[non_voll].sum()
+    total_mwh = gen_mwh.sum()
+    shedding = disp[voll_g].sum().sum() if voll_g else 0.0
+
+    # CO₂
+    co2_total = sum(
+        gen_mwh[g] * CO2_FACTOR.get(gi.loc[g, "carrier"], 0.0)
+        for g in non_voll if g in gi.index
+    )
+    intensity = co2_total / total_mwh * 1000 if total_mwh > 0 else 0.0  # gCO₂/kWh
+
+    # Renewable share
+    ren_carriers = {"solar", "onwind", "hydro", "geothermal", "solar_thermal", "biogas", "biomass", "nuclear"}
+    ren_mwh = sum(
+        gen_mwh[g] for g in non_voll
+        if g in gi.index and gi.loc[g, "carrier"] in ren_carriers
+    )
+    ren_pct = ren_mwh / total_mwh * 100 if total_mwh > 0 else 0.0
+
+    # Curtailment (VRE only)
+    curt_total = 0.0
+    if not n.generators_t.p_max_pu.empty:
+        vre_g = [g for g in n.generators_t.p_max_pu.columns if g in gi.index and gi.loc[g, "carrier"] in VRE_CARRIERS]
+        if vre_g:
+            avail = n.generators_t.p_max_pu[vre_g].multiply(n.generators.loc[vre_g, "p_nom"])
+            curt_total = (avail - disp.reindex(columns=vre_g, fill_value=0.0)).clip(lower=0).sum().sum()
+
+    # Avg shadow price
+    sp = n.buses_t.marginal_price
+    avg_price = sp.values.mean() if not sp.empty else 0.0
+
+    return {
+        "Costo total ($M)":   n.objective / 1e6,
+        "CO₂ (MtCO₂)":       co2_total / 1e6,
+        "Intensidad (gCO₂/kWh)": intensity,
+        "% Renovable":        ren_pct,
+        "Curtailment (GWh)":  curt_total / 1e3,
+        "Shedding (MWh)":     shedding,
+        "Precio med. ($/MWh)": avg_price,
+    }
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Build & solve
@@ -1273,6 +1343,101 @@ with tabs[-1]:
             )
             st.plotly_chart(fig_sp, use_container_width=True)
 
+    # ── Scenario comparison ────────────────────────────────────────────────────
+    st.subheader("Comparativa de escenarios")
+    st.caption("Corre todos los escenarios con el mismo período de demanda y compara métricas clave.")
+
+    _cmp_btn = st.button("⚡ Comparar todos los escenarios", type="secondary")
+    if _cmp_btn:
+        _cmp_rows: dict[str, dict] = {}
+        _cmp_prog = st.progress(0, text="Iniciando…")
+        for _si, (_skey, _sval) in enumerate(SCENARIOS.items()):
+            _cmp_prog.progress((_si) / len(SCENARIOS), text=f"Optimizando: {_skey}…")
+            try:
+                _sp = _sval["params"]
+                _sc = compute_effective_costs(_sp)
+                _sdm = _sp.get("demand_multiplier", {})
+                _sdm = {k: v for k, v in _sdm.items() if v != 1.0} or None
+                _scm = _sp.get("capacity_multiplier", {}) or None
+                _sfo = _sp.get("forced_outage", {})
+                _sfo = _sfo if _sfo.get("enabled", False) else None
+                _sbat = _sp if _sp.get("battery_enable", False) else None
+                _sn = build_and_solve(
+                    centrales_base.copy(), p_max_pu_raw, dem_z,
+                    _sc, growth_2026, float(voll_input),
+                    demand_mult=_sdm, capacity_mult=_scm,
+                    forced_outage=_sfo, battery_config=_sbat,
+                )
+                _cmp_rows[_skey] = extract_metrics(_sn)
+            except Exception as _ex:
+                _cmp_rows[_skey] = {"error": str(_ex)}
+        _cmp_prog.progress(1.0, text="Listo.")
+        st.session_state["scenario_comparison"] = _cmp_rows
+
+    if "scenario_comparison" in st.session_state:
+        _cmp_data = st.session_state["scenario_comparison"]
+        _valid = {k: v for k, v in _cmp_data.items() if "error" not in v}
+        _failed = {k: v for k, v in _cmp_data.items() if "error" in v}
+
+        if _valid:
+            _cmp_df = pd.DataFrame(_valid).T
+            _cmp_df.index.name = "Escenario"
+
+            # Highlight: best value per column (green = better)
+            _better_low  = {"Costo total ($M)", "CO₂ (MtCO₂)", "Intensidad (gCO₂/kWh)", "Curtailment (GWh)", "Shedding (MWh)", "Precio med. ($/MWh)"}
+            _better_high = {"% Renovable"}
+
+            def _style_col(col: pd.Series) -> list[str]:
+                if col.name in _better_low:
+                    best = col.min()
+                    return ["background-color:#14532d; color:white; font-weight:bold" if v == best else "" for v in col]
+                elif col.name in _better_high:
+                    best = col.max()
+                    return ["background-color:#14532d; color:white; font-weight:bold" if v == best else "" for v in col]
+                return [""] * len(col)
+
+            st.dataframe(
+                _cmp_df.style
+                    .apply(_style_col, axis=0)
+                    .format({
+                        "Costo total ($M)":      "{:,.2f}",
+                        "CO₂ (MtCO₂)":          "{:.4f}",
+                        "Intensidad (gCO₂/kWh)": "{:.0f}",
+                        "% Renovable":           "{:.1f}%",
+                        "Curtailment (GWh)":     "{:.1f}",
+                        "Shedding (MWh)":        "{:,.0f}",
+                        "Precio med. ($/MWh)":   "{:.1f}",
+                    }),
+                use_container_width=True,
+                height=310,
+            )
+            st.caption("Verde = mejor valor en esa columna.")
+
+            # Bar charts: cost + CO2 + renewable share
+            _metrics_to_plot = [
+                ("Costo total ($M)",  "Costo total ($M)", "#2563EB"),
+                ("CO₂ (MtCO₂)",      "CO₂ (MtCO₂)",      "#EF4444"),
+                ("% Renovable",       "% Renovable",       "#10B981"),
+            ]
+            _bar_cols = st.columns(3)
+            for _bi, (_mkey, _mlabel, _mcolor) in enumerate(_metrics_to_plot):
+                _fig_bar = go.Figure(go.Bar(
+                    x=list(_valid.keys()),
+                    y=[_valid[s].get(_mkey, 0) for s in _valid],
+                    marker_color=_mcolor,
+                    text=[f"{_valid[s].get(_mkey, 0):.2f}" for s in _valid],
+                    textposition="auto",
+                ))
+                _fig_bar.update_layout(
+                    title=_mlabel, height=300,
+                    margin=dict(l=0, r=0, t=36, b=0),
+                    xaxis=dict(tickangle=-30, tickfont=dict(size=9)),
+                )
+                _bar_cols[_bi].plotly_chart(_fig_bar, use_container_width=True)
+
+        if _failed:
+            st.warning(f"Escenarios con error: {', '.join(_failed.keys())}")
+
     # ── Reserve margin ────────────────────────────────────────────────────────
     st.subheader("Margen de reserva por sistema")
     _rm_cols = st.columns(len(SISTEMAS))
@@ -1294,22 +1459,6 @@ with tabs[-1]:
     st.caption("Margen de reserva = (capacidad instalada − pico de demanda) / pico de demanda. Referencia mínima: 20%.")
 
     # ── CO₂ emissions ─────────────────────────────────────────────────────────
-    CO2_FACTOR: dict[str, float] = {   # tCO₂/MWh (combustible → eléctrico)
-        "gas_ccgt":      0.37,
-        "gas_ocgt":      0.55,
-        "steam_other":   0.85,
-        "diesel_engine": 0.70,
-        "chp":           0.45,
-        "nuclear":       0.012,
-        "hydro":         0.024,
-        "solar":         0.0,
-        "onwind":        0.0,
-        "solar_thermal": 0.0,
-        "geothermal":    0.038,
-        "biogas":        0.0,
-        "biomass":       0.0,
-        "battery":       0.0,
-    }
     st.subheader("Emisiones de CO₂ estimadas")
     _non_voll = [g for g in dispatch.columns if not g.startswith("VoLL_")]
     _gen_mwh_co2 = dispatch[_non_voll].sum()
