@@ -595,7 +595,7 @@ with st.expander("📋 Capacidad instalada por tecnología y sistema", expanded=
         columns=[c for c in CARRIERS if c in cap_base.columns], fill_value=0
     )
     st.markdown("**Base (MW)** — Fuente: PRODESEN / CFE registros de capacidad instalada")
-    st.dataframe(cap_base.style.format("{:,.0f}"), use_container_width=True)
+    st.dataframe(cap_base.style.format("{:,.0f}"), width='stretch')
 
     if growth_2026:
         growth_df  = pd.DataFrame(GROWTH_2026, columns=["name", "bus", "carrier", "p_nom"])
@@ -607,7 +607,7 @@ with st.expander("📋 Capacidad instalada por tecnología y sistema", expanded=
         st.markdown(
             "**Adiciones 2026 esperadas (MW)** — Fuente: PRODESEN 2026-2030 / CFE Plan de Expansión"
         )
-        st.dataframe(growth_agg.style.format("{:,.0f}"), use_container_width=True)
+        st.dataframe(growth_agg.style.format("{:,.0f}"), width='stretch')
 
 # ── Sliders de costos variables ───────────────────────────────────────────────
 with st.expander("③ 🎚️ Costos variables por tecnología ($/MWh)", expanded=True):
@@ -1275,7 +1275,7 @@ def dispatch_chart(bus: str, title: str) -> None:
         legend=dict(orientation="h", y=-0.25, font=dict(size=11)),
         margin=dict(l=0, r=0, t=36, b=80),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # ── Helper: shadow-price chart ────────────────────────────────────────────────
@@ -1304,7 +1304,7 @@ def shadow_price_chart(bus: str) -> None:
         yaxis_title="$/MWh", height=260,
         margin=dict(l=0, r=0, t=36, b=0),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     st.caption(
         f"Máximo: **{mx:,.1f} $/MWh** — Promedio: **{avg:,.1f} $/MWh**  \n"
         "ℹ️ El PML real incluye componentes de **congestión** y **pérdidas** que este modelo no calcula "
@@ -1342,7 +1342,7 @@ def curtailment_chart(bus: str) -> None:
         margin=dict(l=0, r=0, t=10, b=0),
         legend=dict(orientation="h", y=-0.3),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # ── Helper: battery SOC chart ─────────────────────────────────────────────────
@@ -1458,7 +1458,7 @@ def battery_soc_chart(bus: str) -> None:
     fig.update_yaxes(title_text="MW",  row=2, col=1, zeroline=True,
                      zerolinecolor="rgba(100,100,100,0.3)")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # ── Tabs per system + global ──────────────────────────────────────────────────
@@ -1523,7 +1523,7 @@ with tabs[-1]:
                 margin=dict(l=0, r=0, t=36, b=0),
                 legend=dict(font=dict(size=10)),
             )
-            pie_cols[idx].plotly_chart(fig_pie, use_container_width=True)
+            pie_cols[idx].plotly_chart(fig_pie, width='stretch')
 
     # Shadow-price comparison
     if not shadow_prices.empty:
@@ -1543,7 +1543,7 @@ with tabs[-1]:
                 yaxis_title="$/MWh", height=320,
                 margin=dict(l=0, r=0, t=36, b=0),
             )
-            st.plotly_chart(fig_sp, use_container_width=True)
+            st.plotly_chart(fig_sp, width='stretch')
 
     # ── Scenario comparison ────────────────────────────────────────────────────
     st.subheader("Comparativa de escenarios")
@@ -1611,7 +1611,7 @@ with tabs[-1]:
                         "Shedding (MWh)":        "{:,.0f}",
                         "Precio med. ($/MWh)":   "{:.1f}",
                     }),
-                use_container_width=True,
+                width='stretch',
                 height=310,
             )
             st.caption("Verde = mejor valor en esa columna.")
@@ -1636,7 +1636,7 @@ with tabs[-1]:
                     margin=dict(l=0, r=0, t=36, b=0),
                     xaxis=dict(tickangle=-30, tickfont=dict(size=9)),
                 )
-                _bar_cols[_bi].plotly_chart(_fig_bar, use_container_width=True)
+                _bar_cols[_bi].plotly_chart(_fig_bar, width='stretch')
 
         if _failed:
             st.warning(f"Escenarios con error: {', '.join(_failed.keys())}")
@@ -1691,7 +1691,7 @@ with tabs[-1]:
     if not _co2_df.empty:
         st.dataframe(
             _co2_df.style.format({"tCO₂": "{:,.1f}", "Factor (tCO₂/MWh)": "{:.3f}"}),
-            use_container_width=True, height=280,
+            height=280, width='stretch',
         )
     st.caption("Factores de emisión orientativos (IPCC AR6 + CFE). No incluyen emisiones de ciclo de vida.")
 
@@ -1753,7 +1753,7 @@ with tabs[-1]:
                 margin=dict(l=0, r=0, t=40, b=0),
                 showlegend=False,
             )
-            st.plotly_chart(_fig_dur, use_container_width=True)
+            st.plotly_chart(_fig_dur, width='stretch')
             if not _sp_s.empty:
                 _pct_zero = (_sp_s == 0).mean() * 100
                 _voll_solved = n.generators.loc[
@@ -1786,7 +1786,7 @@ with tabs[-1]:
             "Cap. MW": "{:,.1f}", "CV $/MWh": "{:.0f}",
             "Gen. MWh": "{:,.0f}", "Costo $": "{:,.0f}", "Parte %": "{:.2f}",
         }),
-        use_container_width=True,
+        width='stretch',
         height=420,
     )
 
@@ -1803,7 +1803,7 @@ with tabs[-1]:
         if _missing_prof:
             st.dataframe(
                 gen_info.loc[[g for g in _missing_prof if g in gen_info.index], ["bus", "carrier", "p_nom"]].head(40),
-                use_container_width=True,
+                width='stretch',
             )
 
     # ── Generador marginal por hora y sistema ────────────────────────────────
@@ -1818,7 +1818,7 @@ with tabs[-1]:
             if not _ps_df.empty:
                 st.markdown(f"**{_ps}** — carriers más frecuentes como marginal plausible:")
                 _most_common = _ps_df["carrier"].fillna("N/D").value_counts().head(5)
-                st.dataframe(_most_common.rename("horas"), use_container_width=False)
+                st.dataframe(_most_common.rename("horas"), width='content')
                 with st.expander(f"Ver tabla completa {_ps}", expanded=False):
                     st.dataframe(
                         _ps_df.style.format({
@@ -1828,7 +1828,7 @@ with tabs[-1]:
                             "pmin_MW": "{:.1f}",
                             "pmax_MW": "{:.1f}",
                         }),
-                        use_container_width=True,
+                        width='stretch',
                         height=320,
                     )
 
