@@ -693,7 +693,7 @@ def extract_metrics(n: pypsa.Network) -> dict:
     avg_price = sp.values.mean() if not sp.empty else 0.0
 
     return {
-        "Costo total ($M)":   n.objective / 1e6,
+        "Costo total ($M)":   float(n.objective) / 1e6,
         "CO₂ (MtCO₂)":       co2_total / 1e6,
         "Intensidad (gCO₂/kWh)": intensity,
         "% Renovable":        ren_pct,
@@ -882,7 +882,7 @@ def build_and_solve(
             mult = demand_mult.get(s, 1.0) if demand_mult else 1.0
             n.add("Load", f"load_{s}", bus=s, p_set=dem_z[s] * mult)
 
-    n.optimize(solver_name="highs")
+    n.optimize(solver_name="highs", include_objective_constant=False)
     return n
 
 
@@ -1005,7 +1005,7 @@ if scen_label:
     st.caption(f"Escenario: **{scen_label}**")
 
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Costo total ($)",            f"{n.objective:,.0f}")
+k1.metric("Costo total ($)",            f"{float(n.objective):,.0f}")
 k2.metric("Generación total (MWh)",
           f"{dispatch.drop(columns=voll_gens, errors='ignore').sum().sum():,.0f}")
 k3.metric("Carga no servida (MWh)",
@@ -1026,7 +1026,7 @@ if _show_comparison:
         _b_voll_gens = [g for g in _b_dispatch.columns if g.startswith("VoLL_")]
         _b_shadow    = _n_base.buses_t.marginal_price
 
-        _b_cost    = _n_base.objective
+        _b_cost    = float(_n_base.objective)
         _b_gen     = _b_dispatch.drop(columns=_b_voll_gens, errors="ignore").sum().sum()
         _b_shed    = _b_dispatch[_b_voll_gens].sum().sum() if _b_voll_gens else 0.0
 
@@ -1046,7 +1046,7 @@ if _show_comparison:
                 _b_curt_total = (_b_avail - _b_disp).clip(lower=0).sum().sum()
 
         _s_gen   = dispatch.drop(columns=voll_gens, errors="ignore").sum().sum()
-        delta_cost  = n.objective - _b_cost
+        delta_cost  = float(n.objective) - _b_cost
         delta_gen   = _s_gen - _b_gen
         delta_shed  = shedding_total - _b_shed
         delta_curt  = curtailment_total - _b_curt_total
@@ -1061,7 +1061,7 @@ if _show_comparison:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric(
             "Δ Costo total ($)",
-            f"{n.objective:,.0f}",
+            f"{float(n.objective):,.0f}",
             delta=_fmt_delta(delta_cost, invert=True),
             delta_color="inverse",
             help=f"Base: ${_b_cost:,.0f}",
