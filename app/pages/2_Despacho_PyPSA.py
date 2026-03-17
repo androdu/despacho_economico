@@ -407,6 +407,16 @@ def load_demand_raw() -> pd.DataFrame:
         .sort_values("snapshot")
         .reset_index(drop=True)
     )
+
+    # Descartar días con datos incompletos (< 20 horas en al menos un sistema)
+    # Evita que archivos parciales de la API causen errores en la optimización
+    dem["_date"] = dem["snapshot"].dt.date
+    hours_per_day_zona = dem.groupby(["_date", "zona"])["snapshot"].nunique()
+    bad_dates = hours_per_day_zona[hours_per_day_zona < 20].index.get_level_values("_date").unique()
+    if len(bad_dates) > 0:
+        dem = dem[~dem["_date"].isin(bad_dates)]
+    dem = dem.drop(columns=["_date"]).reset_index(drop=True)
+
     return dem
 
 # ──────────────────────────────────────────────────────────────────────────────

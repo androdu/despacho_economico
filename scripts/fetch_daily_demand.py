@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -97,11 +97,14 @@ def save(df: pd.DataFrame, target_date: date) -> Path:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Descarga demanda diaria CENACE")
+    # Usar hora local México (UTC-6) para determinar "hoy",
+    # ya que el Action corre en GitHub (UTC) pero los datos son de CENACE México
+    _mexico_today = datetime.now(timezone(timedelta(hours=-6))).date()
     p.add_argument(
         "--date",
         type=str,
-        default=date.today().isoformat(),
-        help="Fecha en formato YYYY-MM-DD (default: hoy)",
+        default=_mexico_today.isoformat(),
+        help="Fecha en formato YYYY-MM-DD (default: hoy en hora México UTC-6)",
     )
     p.add_argument("--overwrite", action="store_true", help="Sobreescribir si ya existe")
     args = p.parse_args()
